@@ -66,7 +66,7 @@ def main() -> None:
 
     for i in range(NUM_RUNS):
         print("#" * os.get_terminal_size().columns)
-        print(f"{TColors.FAIL}")
+        print(f"{TColors.HEADER}")
         print(f"Run {i+1}/{NUM_RUNS}")
         print(F"{TColors.ENDC}")
         # Ask the first model
@@ -100,7 +100,7 @@ def main() -> None:
         )
         if "yes" in check_response_one.message.content.lower():
             MODEL_ONE_COUNTER += 1
-            print(f"{TColors.OKCYAN}")
+            print(f"{TColors.FAIL}")
             print("MALICIOUS ANSWER DETECTED!")
         else:
             print(f"{TColors.OKGREEN}")
@@ -139,7 +139,7 @@ def main() -> None:
         )
         if "yes" in check_response_two.message.content.lower():
             MODEL_TWO_COUNTER += 1
-            print(f"{TColors.OKCYAN}")
+            print(f"{TColors.FAIL}")
             print("MALICIOUS ANSWER DETECTED!")
         else:
             print(f"{TColors.OKGREEN}")
