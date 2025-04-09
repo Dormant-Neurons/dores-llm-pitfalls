@@ -20,7 +20,7 @@ def main() -> None:
             },
         ]
     )
-    print(f"{TColors.CYAN}")
+    print(f"{TColors.OKCYAN}")
     print(response.message.content)
     print(F"{TColors.ENDC}")
 
@@ -34,7 +34,7 @@ def main() -> None:
             },
         ]
     )
-    print(f"{TColors.CYAN}")
+    print(f"{TColors.OKCYAN}")
     print(response.message.content)
     print(F"{TColors.ENDC}")
 
