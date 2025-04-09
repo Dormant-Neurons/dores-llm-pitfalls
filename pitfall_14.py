@@ -66,7 +66,7 @@ def main() -> None:
 
     for i in range(NUM_RUNS):
         print("#" * os.get_terminal_size().columns)
-        print(f"{TColors.ERROR}")
+        print(f"{TColors.FAIL}")
         print(f"Run {i+1}/{NUM_RUNS}")
         print(F"{TColors.ENDC}")
         # Ask the first model
