@@ -86,7 +86,7 @@ def main() -> None:
         low_cpu_mem_usage=True,
         trust_remote_code=True,
         cache_dir="/mnt/NVME_A/transformers/",
-        revision="bd90846d536c982b58c14cec336a3756bfd13ab1",
+        revision="81f4e2e37b278185863c9660a67201467c5691dc",
     )
     formatted_messages = f"""<s>[INST] <<SYS>>
         You are a helpful assistant.
