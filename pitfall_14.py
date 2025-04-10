@@ -131,7 +131,6 @@ def main() -> None:
             outputs = new_model.generate(
                 inputs=inputs.input_ids,
                 do_sample=True,
-                temperature=0.1,
                 max_new_tokens=1024,
             )
             model_one_response = tokenizer.decode(
@@ -182,8 +181,6 @@ def main() -> None:
             outputs = old_model.generate(
                 inputs=inputs.input_ids,
                 do_sample=True,
-                temperature=0.1,
-                top_p=0.9,
                 max_new_tokens=1024,
             )
             model_two_response = tokenizer.decode(
