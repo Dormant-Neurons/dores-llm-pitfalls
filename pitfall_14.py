@@ -218,7 +218,7 @@ def main() -> None:
     print(f"{TColors.OKBLUE}")
     print("Results:")
     print(f"First model: {model_one_counter}/{num_runs} ({model_one_counter/num_runs*100:.2f}%)")
-    #print(f"Second model: {model_two_counter}/{num_runs} ({model_two_counter/num_runs*100:.2f}%)")
+    print(f"Second model: {model_two_counter}/{num_runs} ({model_two_counter/num_runs*100:.2f}%)")
     print(f"{TColors.ENDC}")
 
 
