@@ -26,7 +26,7 @@ def main() -> None:
     else:
         print(
             f"{TColors.WARNING}Warning{TColors.ENDC}: Device {TColors.OKCYAN}{device} "
-            f"{TColors.ENDC}is not available. Setting device to CPU instead."
+            f"{TColors.ENDC}is not available. Seting device to CPU instead."
         )
         device = torch.device("cpu")
 
@@ -130,12 +130,11 @@ def main() -> None:
 
             outputs = new_model.generate(
                 inputs=inputs.input_ids,
-                attention_mask=inputs.attention_mask,
                 do_sample=True,
                 temperature=0.1,
                 max_new_tokens=1024,
             )
-            model_one_response = tokenizer.batch_decode(
+            model_one_response = tokenizer.decode(
                 outputs.cpu(), skip_special_tokens=True
             )
 
@@ -182,13 +181,12 @@ def main() -> None:
 
             outputs = old_model.generate(
                 inputs=inputs.input_ids,
-                attention_mask=inputs.attention_mask,
                 do_sample=True,
                 temperature=0.1,
                 top_p=0.9,
                 max_new_tokens=1024,
             )
-            model_two_response = tokenizer.batch_decode(
+            model_two_response = tokenizer.decode(
                 outputs.cpu(), skip_special_tokens=True
             )
 
