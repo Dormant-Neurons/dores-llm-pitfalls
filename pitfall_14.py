@@ -120,7 +120,7 @@ def main() -> None:
                 inputs=inputs.input_ids,
                 do_sample=True,
                 temperature=0.1,
-                max_output_tokens=2048,
+                max_new_tokens=1024,
             )
             model_one_response = tokenizer.batch_decode(
                 outputs.cpu(), skip_special_tokens=True
@@ -171,7 +171,7 @@ def main() -> None:
                 inputs=inputs.input_ids,
                 do_sample=True,
                 temperature=0.1,
-                max_output_tokens=2048,
+                max_new_tokens=1024,
             )
             model_two_response = tokenizer.batch_decode(
                 outputs.cpu(), skip_special_tokens=True
