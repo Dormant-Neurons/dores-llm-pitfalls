@@ -135,7 +135,7 @@ def main() -> None:
                 max_new_tokens=1024,
             )
             model_one_response = tokenizer.decode(
-                outputs.cpu(), skip_special_tokens=True
+                outputs.cpu()[0], skip_special_tokens=True
             )
 
         print(f"{TColors.OKCYAN}")
@@ -187,7 +187,7 @@ def main() -> None:
                 max_new_tokens=1024,
             )
             model_two_response = tokenizer.decode(
-                outputs.cpu(), skip_special_tokens=True
+                outputs.cpu()[0], skip_special_tokens=True
             )
 
         print(f"{TColors.OKCYAN}")
