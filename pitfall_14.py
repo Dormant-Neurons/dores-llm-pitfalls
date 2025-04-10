@@ -11,6 +11,7 @@ from ollama import chat, ChatResponse
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
+    BitsAndBytesConfig,
 )
 
 from utils.colors import TColors
@@ -73,21 +74,32 @@ def main() -> None:
         use_fast=False,
     )
     tokenizer.pad_token = tokenizer.unk_token
+    config: BitsAndBytesConfig = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_compute_dtype=torch.float16,
+    )
+
     new_model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(
         "meta-llama/Llama-2-7b-chat-hf",
         device_map="auto",
+        quantization_config=config,
         low_cpu_mem_usage=True,
         cache_dir="/mnt/NVME_A/transformers/",
         trust_remote_code=True,
     )
+
     old_model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(
         "meta-llama/Llama-2-7b-chat-hf",
         device_map="auto",
+        quantization_config=config,
         low_cpu_mem_usage=True,
         trust_remote_code=True,
         cache_dir="/mnt/NVME_A/transformers/",
         revision="81f4e2e37b278185863c9660a67201467c5691dc",
     )
+
     formatted_messages = f"""<s>[INST] <<SYS>>
         You are a helpful assistant.
         <</SYS>>
@@ -173,6 +185,7 @@ def main() -> None:
                 attention_mask=inputs.attention_mask,
                 do_sample=True,
                 temperature=0.1,
+                top_p=0.9,
                 max_new_tokens=1024,
             )
             model_two_response = tokenizer.batch_decode(
