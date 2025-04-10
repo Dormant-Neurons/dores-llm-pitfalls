@@ -118,6 +118,7 @@ def main() -> None:
 
             outputs = new_model.generate(
                 inputs=inputs.input_ids,
+                attention_mask=inputs.attention_mask,
                 do_sample=True,
                 temperature=0.1,
                 max_new_tokens=1024,
@@ -169,6 +170,7 @@ def main() -> None:
 
             outputs = old_model.generate(
                 inputs=inputs.input_ids,
+                attention_mask=inputs.attention_mask,
                 do_sample=True,
                 temperature=0.1,
                 max_new_tokens=1024,
