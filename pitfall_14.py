@@ -1,6 +1,7 @@
 """pitfall 14 experiment file"""
 # use two differnet versions (commits for example) of the same model to check
 # if the behavior changes a lot
+# if this does not work, check for quantization differences as well
 import os
 import datetime
 import getpass

@@ -1,0 +1,1 @@
+# maybe argue that baselines are important for context and how good or bad a certain result is
