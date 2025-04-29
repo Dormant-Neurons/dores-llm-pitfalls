@@ -2,6 +2,7 @@
 # use two differnet versions (commits for example) of the same model to check
 # if the behavior changes a lot
 # if this does not work, check for quantization differences as well
+# combine this with pitfall 3, since quantization model result should not be generalized onto unquantized models
 import os
 import datetime
 import getpass
