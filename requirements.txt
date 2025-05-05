@@ -1,2 +1,5 @@
 ollama
 torch
+transformers
+datasets
+tqdm
