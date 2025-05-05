@@ -24,7 +24,7 @@ module load cuda/11.6
 module load pytorch/gpu-cuda-11.6/1.12.0
 module load scikit-learn/1.1.1
 
-python -m pip install --user --quiet \
+python -m pip install --user \
        transformers datasets evaluate accelerate \
        tqdm wandb h5py dill
 
