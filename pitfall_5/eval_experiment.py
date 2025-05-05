@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
 """
 Fine‑tune CodeT5p‑220M on PrimeVul with a 512‑token limit
-using a CUDA‑enabled GPU, then evaluate on two 1 000‑sample
-subsets (≤512 and >512 tokens).
+using automatic mixed precision (AMP) on a CUDA GPU. After
+training, the script evaluates on two 1 000‑sample subsets
+(≤512 and >512 tokens).
 
 Author: <you>   Date: 2025‑05‑05
+
+Key change vs. the previous version
+----------------------------------
+The model is **loaded in full‑precision (FP32)** and AMP is
+handled by the Trainer (`fp16=True`). This avoids the
+"Attempting to unscale FP16 gradients" runtime error that
+occurs when the model itself is instantiated in FP16.
 """
 
 import os
@@ -42,7 +50,6 @@ def make_splits(tokenizer) -> DatasetDict:
 
     ds_all = ds_all.map(add_toklen, num_proc=os.cpu_count())
 
-    # shuffle once, then train / val / test proportional split
     ds_all = ds_all.shuffle(seed=SPLIT_SEED)
     n = len(ds_all)
     train_end = int(0.6 * n)
@@ -57,32 +64,22 @@ def make_splits(tokenizer) -> DatasetDict:
 
 
 def tokenize_func(batch, tokenizer):
-    """
-    Batched tokenisation:
-      • batch["func"]   : list[str]
-      • batch["target"] : list[[0] or [1]]
-    Returns dict of equal‑length lists ready for Arrow.
-    """
+    """Tokenise code + labels for Seq2Seq fine‑tuning."""
     codes = batch["func"]
-    raw_labels = [
-        t[0] if isinstance(t, list) else t  # unwrap [0]/[1] → 0/1
-        for t in batch["target"]
-    ]
-    # ---- tokenise code (trunc 512) ----
+    raw_labels = [t[0] if isinstance(t, list) else t for t in batch["target"]]
+
     model_inputs = tokenizer(
         codes,
         truncation=True,
         max_length=CTX_LIMIT,
     )
 
-    # ---- tokenise labels ("0" / "1") ----
     label_texts = [str(int(x)) for x in raw_labels]
-    # use same tokenizer; tiny sequences, so loop is fine
     model_inputs["labels"] = [tokenizer(t).input_ids for t in label_texts]
     return model_inputs
 
 
-def build_eval_subsets(test_ds: Dataset, tokenizer):
+def build_eval_subsets(test_ds: Dataset):
     short_idx = [i for i, n in enumerate(test_ds["n_tok"]) if n <= CTX_LIMIT]
     long_idx = [i for i, n in enumerate(test_ds["n_tok"]) if n > CTX_LIMIT]
 
@@ -90,15 +87,13 @@ def build_eval_subsets(test_ds: Dataset, tokenizer):
     short_sample = rng.choice(short_idx, size=EVAL_N, replace=False)
     long_sample = rng.choice(long_idx, size=EVAL_N, replace=False)
 
-    short_ds = test_ds.select(short_sample)
-    long_ds = test_ds.select(long_sample)
-    return short_ds, long_ds
+    return test_ds.select(short_sample), test_ds.select(long_sample)
 
 
 @torch.no_grad()
 def eval_f1(ds: Dataset, tokenizer, model, desc: str) -> float:
     model.eval()
-    BATCH = 32  # adjust if VRAM is limited
+    BATCH = 32
     y_true, y_pred = [], []
 
     for i in tqdm(range(0, len(ds), BATCH), desc=desc, ncols=80):
@@ -131,37 +126,28 @@ def main():
 
     print("Transformers version :", transformers.__version__)
     print("Loaded from          :", transformers.__file__)
-    print(
-        "Python path entry    :",
-        next(p for p in sys.path if transformers.__file__.startswith(p)),
-    )
+    print("CUDA available       :", torch.cuda.is_available())
 
-    # Prefer CUDA if available, otherwise CPU fallback
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f">> device: {device}")
 
-    # Set seeds for reproducibility
     torch.manual_seed(SPLIT_SEED)
     if device.type == "cuda":
         torch.cuda.manual_seed_all(SPLIT_SEED)
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        MODEL_ID, trust_remote_code=True, use_fast=True
-    )
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True, use_fast=True)
     splits = make_splits(tokenizer)
 
-    # tokenise train/val
     tokenised = splits.map(
         lambda ex: tokenize_func(ex, tokenizer),
         remove_columns=splits["train"].column_names,
         batched=True,
-        num_proc=1,  # simple & portable
+        num_proc=1,
     )
 
-    dtype = torch.float16 if device.type == "cuda" else torch.float32
+    # Load model **without** forcing FP16 weights; AMP will cast on‑the‑fly
     model = AutoModelForSeq2SeqLM.from_pretrained(
         MODEL_ID,
-        torch_dtype=dtype,
         low_cpu_mem_usage=True,
     ).to(device)
 
@@ -175,7 +161,7 @@ def main():
         logging_strategy="steps",
         logging_steps=100,
         predict_with_generate=True,
-        fp16=(device.type == "cuda" and dtype == torch.float16),
+        fp16=(device.type == "cuda"),  # safe AMP
         save_total_limit=2,
         seed=SPLIT_SEED,
         dataloader_pin_memory=(device.type == "cuda"),
@@ -194,7 +180,7 @@ def main():
     trainer.save_model(f"{OUTPUT_DIR}/final")
 
     # ─── evaluation on two 1 k subsets ─────────────────── #
-    short_ds, long_ds = build_eval_subsets(splits["test"], tokenizer)
+    short_ds, long_ds = build_eval_subsets(splits["test"])
 
     f1_short = eval_f1(short_ds, tokenizer, model, "Eval ≤512")
     f1_long = eval_f1(long_ds, tokenizer, model, "Eval >512 (trunc)")
