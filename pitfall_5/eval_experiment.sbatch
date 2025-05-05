@@ -24,9 +24,19 @@ module load cuda/11.6
 module load pytorch/gpu-cuda-11.6/1.12.0
 module load scikit-learn/1.1.1
 
-python -m pip install --user \
-       transformers datasets evaluate accelerate \
-       tqdm wandb h5py dill
+pip install --user pandas
+pip install --user numpy
+pip install --user libclang
+pip install --user transformers
+pip install --user datasets
+pip install --user wandb
+pip install --user evaluate
+pip install --user accelerate
+pip install --user torchtext
+pip install --user pytorch-lightning
+pip install --user nltk
+pip install --user sentencepiece
+pip install --user tqdm
 
 export PYTHONUNBUFFERED=1
 export OMP_NUM_THREADS=1
