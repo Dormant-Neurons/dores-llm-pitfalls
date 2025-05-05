@@ -28,7 +28,8 @@ pip install --user pandas
 pip install --user numpy
 pip install --user libclang
 pip install --user transformers
-pip install --user datasets
+pip install --user datasets==2.18.0
+pip install --user fsspec==2023.11.0
 pip install --user wandb
 pip install --user evaluate
 pip install --user accelerate
