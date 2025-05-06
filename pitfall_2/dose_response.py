@@ -142,19 +142,36 @@ def eval_f1(ds: Dataset, tokenizer, model) -> float:
 # ───────────────────────── core experiment ───────────────────────
 
 def run_for_ratio(ratio: float, splits: DatasetDict, tokenizer, epochs: int, tag: str):
+    """Fine‑tune at a given leakage ratio and print overall test F1."""
     rng = np.random.default_rng(SPLIT_SEED)
     leak_size = int(ratio * len(splits["test"]))
     leak_idx  = rng.choice(len(splits["test"]), size=leak_size, replace=False) if leak_size else []
     leak_ds   = splits["test"].select(leak_idx) if leak_size else None
 
-    train_ds = concatenate_datasets([splits["train"], leak_ds]).shuffle(seed=SPLIT_SEED) if leak_size else splits["train"]
+    train_ds = (concatenate_datasets([splits["train"], leak_ds]).shuffle(seed=SPLIT_SEED)
+                if leak_size else splits["train"])
 
-    tokenised_train = train_ds.map(lambda ex: tokenize_func(ex, tokenizer),
-                                   remove_columns=train_ds.column_names,
-                                   batched=True, num_proc=1)
-    tokenised_val   = splits["validation"].map(lambda ex: tokenize_func(ex, tokenizer),
-                                               remove_columns=splits["validation"].column_names,
-                                               batched=True, num_proc=1)
+    # Tokenise → we *explicitly* remove only the known raw columns to avoid the
+    # rare edge case where remove_columns=train_ds.column_names would wipe out
+    # everything when train_ds already lacks those names (causing len=0).
+    cols_to_strip = [c for c in ["func", "target", "n_tok"] if c in train_ds.column_names]
+
+    tokenised_train = train_ds.map(
+        lambda ex: tokenize_func(ex, tokenizer),
+        remove_columns=cols_to_strip,
+        batched=True,
+        num_proc=1,
+    )
+    tokenised_val = splits["validation"].map(
+        lambda ex: tokenize_func(ex, tokenizer),
+        remove_columns=cols_to_strip,
+        batched=True,
+        num_proc=1,
+    )
+
+    if len(tokenised_train) == 0:
+        print(f"{tag:10s} | Leak {int(ratio*100):3d}% | *SKIPPED* (train set empty)")
+        return
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_ID, low_cpu_mem_usage=True).to(device)
@@ -186,10 +203,15 @@ def run_for_ratio(ratio: float, splits: DatasetDict, tokenizer, epochs: int, tag
 
     del model; torch.cuda.empty_cache()
 
-
 # ───────────────────────── main ────────────────────────────
 
 def main():
+    parser = argparse.ArgumentParser(description="Leakage ratio experiment")
+    parser.add_argument("--dataset", required=True,
+                        help="Dataset key (BigVul, Devign, DiverseVul, PrimeVul) or 🤗 hub path")
+    parser.add_argument("--epochs", type=int, default=1, help="Fine‑tuning epochs per ratio")
+    args = parser.parse_args()
+    ...():
     parser = argparse.ArgumentParser(description="Leakage ratio experiment")
     parser.add_argument("--dataset", required=True,
                         help="Dataset key (BigVul, Devign, DiverseVul, PrimeVul) or 🤗 hub path")
