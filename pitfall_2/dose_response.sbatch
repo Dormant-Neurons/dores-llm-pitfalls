@@ -5,7 +5,7 @@
 #SBATCH -D ./
 # Job Name:
 #SBATCH -J PT_GPU
-# Queue:
+# Queue / resources:
 #SBATCH --ntasks=1
 #SBATCH --constraint="gpu"
 #SBATCH --gres=gpu:a100:1
@@ -15,7 +15,7 @@
 #SBATCH --mail-type=all
 #SBATCH --mail-user=niklas.risse@mpi-sp.org
 #
-# wall clock limit
+# wall‑clock limit:
 #SBATCH --time=23:00:00
 
 module purge
@@ -24,6 +24,7 @@ module load cuda/11.6
 module load pytorch/gpu-cuda-11.6/1.12.0
 module load scikit-learn/1.1.1
 
+# ── Python deps (one per line) ────────────────────────────────────
 pip install --user pandas
 pip install --user numpy
 pip install --user libclang
@@ -42,5 +43,10 @@ pip install --user tqdm
 export PYTHONUNBUFFERED=1
 export OMP_NUM_THREADS=1
 
-srun python dores-llm-pitfalls/pitfall_2/dose_response.py $*
+# ── Hugging Face token handling ──────────────────────────────────
+export HF_TOKEN="$1"   # first CLI arg is the token
+shift                  # remaining args are for the Python script
+
+# ── Run the experiment ───────────────────────────────────────────
+srun python dores-llm-pitfalls/pitfall_2/dose_response.py "$@"
 echo "job finished"

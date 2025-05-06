@@ -27,6 +27,7 @@ Author: <you>   2025‑05‑05
 
 import argparse
 from typing import Any, Dict
+import os
 
 import numpy as np
 import torch
@@ -209,7 +210,10 @@ def main():
 
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True, use_fast=True)
 
-    ds_all = load_dataset(hf_id, split="train+validation+test")
+    HF_TOKEN = os.getenv("HF_TOKEN")  # set in sbatch: export HF_TOKEN=hf_xxx
+    ds_all = load_dataset(hf_id, split="train+validation+test",
+                      use_auth_token=HF_TOKEN)
+
     ds_all = standardise_columns(ds_all, code_key, label_key, positive)
 
     splits = add_toklen_and_split(ds_all, tokenizer)
