@@ -14,20 +14,34 @@ If you pass an arbitrary 🤗 Hub path that isn’t in DATASETS the script
 assumes the columns are named ``func`` and ``target`` with positive
 label 1.
 
-For each leakage ratio r ∈ {0,0.2,…,1.0} the script:
+Run options
+-----------
+* **Preset sweep** *(default)* – if you omit --ratio, the script sweeps
+  over the preset ratios ``[0.0,0.2,0.4,0.6,0.8,1.0]``
+* **Single ratio** – pass ``--ratio R`` with ``R∈[0,1]`` to only run
+  that leakage level. This is handy when launching multiple jobs in
+  parallel.
+
+For each leakage ratio r the script:
   1. Copies ⌊r·|test|⌋ random test rows into the training set.
   2. Fine‑tunes CodeT5p for the chosen number of epochs (default 1).
   3. Reports **overall macro‑F1 on the full test set**.
 
-Example:
+Example usage
+~~~~~~~~~~~~~
+    # run the whole sweep
     python leak_ratio_experiment.py --dataset BigVul --epochs 1
 
-Author: <you>   2025‑05‑05
+    # run only 40 % leakage
+    python leak_ratio_experiment.py --dataset BigVul --ratio 0.4 --epochs 3
+
+Author: <you>   2025‑05‑05 (updated 2025‑05‑07)
 """
 
 import argparse
-from typing import Any, Dict
+from typing import Any, Dict, List
 import os
+import sys
 
 import numpy as np
 import torch
@@ -45,7 +59,8 @@ from sklearn.metrics import f1_score
 MODEL_ID = "Salesforce/codet5p-220m"
 CTX_LIMIT = 512
 SPLIT_SEED = 42
-LEAK_RATIOS = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+# Default sweep when --ratio is *omitted*
+DEFAULT_LEAK_RATIOS: List[float] = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
 
 DATASETS: Dict[str, Dict[str, Any]] = {
     "BigVul": {
@@ -138,6 +153,9 @@ def eval_f1(ds: Dataset, tokenizer, model):
 # ───────────────────────── core routine ───────────────────────────
 
 def run_for_ratio(ratio: float, splits: DatasetDict, tokenizer, epochs: int, tag: str):
+    if not 0.0 <= ratio <= 1.0:
+        raise ValueError(f"Leakage ratio must be in [0,1] (got {ratio})")
+
     rng = np.random.default_rng(SPLIT_SEED)
     leak_n = int(ratio * len(splits["test"]))
     leak_idx = rng.choice(len(splits["test"]), size=leak_n, replace=False) if leak_n else []
@@ -194,6 +212,8 @@ def main():
                         help="Dataset key (e.g. BigVul) or HF path (owner/name)")
     parser.add_argument("--epochs", type=int, default=1,
                         help="Fine‑tuning epochs per leakage ratio (default 1)")
+    parser.add_argument("--ratio", type=float, default=None, metavar="R",
+                        help="Leakage ratio R ∈ [0,1]. If omitted run the preset sweep.")
     args = parser.parse_args()
 
     # Resolve mapping or fall back to defaults
@@ -205,22 +225,28 @@ def main():
         hf_id, code_key, label_key, positive = args.dataset, "func", "target", 1
         tag = hf_id.split("/")[-1]
 
+    ratios = [args.ratio] if args.ratio is not None else DEFAULT_LEAK_RATIOS
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f">> device: {device}")
+    print(f"\n>> device: {device}")
+    print(f">> running ratios: {', '.join(f'{r:.1f}' for r in ratios)}\n")
 
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True, use_fast=True)
 
     HF_TOKEN = os.getenv("HF_TOKEN")  # set in sbatch: export HF_TOKEN=hf_xxx
-    ds_all = load_dataset(hf_id, split="train+validation+test",
-                      use_auth_token=HF_TOKEN)
+    ds_all = load_dataset(hf_id, split="train+validation+test", use_auth_token=HF_TOKEN)
 
     ds_all = standardise_columns(ds_all, code_key, label_key, positive)
 
     splits = add_toklen_and_split(ds_all, tokenizer)
 
-    for r in LEAK_RATIOS:
+    for r in ratios:
         run_for_ratio(r, splits, tokenizer, args.epochs, tag)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
