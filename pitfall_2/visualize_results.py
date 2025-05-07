@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 leak_percentages = [0, 20, 40, 60, 80, 100]
 
 data = {
-    "Devign":     [0.616, None, None, None, None, 0.973],
+    "Devign":     [0.616, 0.708, 0.780, 0.845, 0.913, 0.973],
     "DiverseVul": [None, None, None, None, None, None],  # Placeholder
     "PrimeVul":   [None, None, None, None, None, None],  # Placeholder
 }
