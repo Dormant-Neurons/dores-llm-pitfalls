@@ -5,7 +5,7 @@ leak_percentages = [0, 20, 40, 60, 80, 100]
 
 data = {
     "Devign":     [0.616, 0.708, 0.780, 0.845, 0.913, 0.973],
-    "DiverseVul": [0.6, 0.671, None, None, None, 0.819],  # Placeholder
+    "DiverseVul": [0.6, 0.671, 0.728, 0.785, 0.839, 0.819],  # Placeholder
     "PrimeVul":   [0.617, 0.683, 0.749, 0.789, 0.855, 0.890],  # Placeholder
 }
 
