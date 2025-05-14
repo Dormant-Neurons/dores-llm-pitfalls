@@ -17,7 +17,6 @@ from ollama import chat, ChatResponse
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
-    pipeline,
 )
 from ctransformers import AutoModelForCausalLM as CAutoModelForCausalLM
 
@@ -101,7 +100,6 @@ def main() -> None:
         context_length=4096,
         hf=True,
     )
-    alt_pipe = pipeline("text-generation", model=alt_model, tokenizer=tokenizer)
 
     formatted_messages = f"""<s>[INST] <<SYS>>
         You are a helpful assistant.
@@ -156,8 +154,17 @@ def main() -> None:
             print("NO MALICIOUS ANSWER DETECTED!")
         print(f"{TColors.ENDC}")
 
-        model_two_response = alt_pipe(formatted_messages, max_new_tokens=1024, do_sample=True)
-        model_two_response = model_two_response[0]["generated_text"]
+        with torch.no_grad():
+            inputs = tokenizer(formatted_messages, return_tensors="pt").to(device)
+
+            outputs = alt_model.generate(
+                inputs=inputs.input_ids,
+                do_sample=True,
+                max_new_tokens=1024,
+            )
+            model_two_response = tokenizer.decode(
+                outputs.cpu()[0], skip_special_tokens=True
+            )
 
         print(f"{TColors.OKCYAN}")
         print(model_two_response)
