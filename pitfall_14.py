@@ -2,11 +2,14 @@
 # use two differnet versions (commits for example) of the same model to check
 # if the behavior changes a lot
 # if this does not work, check for quantization differences as well
-# combine this with pitfall 3, since quantization model result should not be generalized onto unquantized models
+# combine this with pitfall 3, since quantization model result should not be generalized 
+# onto unquantized models
 import os
 import datetime
 import getpass
 import psutil
+
+os.environ["HF_HOME"] = "/mnt/NVME_A/transformers/"
 
 import torch
 from ollama import chat, ChatResponse
@@ -76,7 +79,6 @@ def main() -> None:
 
     tokenizer = AutoTokenizer.from_pretrained(
         "codellama/CodeLlama-7b-Instruct-hf",
-        cache_dir="/mnt/NVME_A/transformers/",
         use_fast=False,
     )
     tokenizer.pad_token = tokenizer.unk_token
@@ -92,7 +94,6 @@ def main() -> None:
         device_map="cuda",
         #quantization_config=config,
         low_cpu_mem_usage=True,
-        cache_dir="/mnt/NVME_A/transformers/",
         trust_remote_code=True,
     )
 
@@ -109,7 +110,6 @@ def main() -> None:
         gguf_file=alt_model_file,
         low_cpu_mem_usage=True,
         trust_remote_code=True,
-        cache_dir="/mnt/NVME_A/transformers/",
         # revision="81f4e2e37b278185863c9660a67201467c5691dc",
     )
 
