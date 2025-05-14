@@ -93,15 +93,15 @@ def main() -> None:
         trust_remote_code=True,
     )
 
-    alt_model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(
-        "TheBloke/CodeLlama-7B-GGUF",
-        device_map="cuda",
-        #quantization_config=config,
-        low_cpu_mem_usage=True,
-        trust_remote_code=True,
-        cache_dir="/mnt/NVME_A/transformers/",
-        # revision="81f4e2e37b278185863c9660a67201467c5691dc",
-    )
+    # alt_model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(
+    #     "TheBloke/CodeLlama-7B-Instruct-GGUF",
+    #     device_map="cuda",
+    #     #quantization_config=config,
+    #     low_cpu_mem_usage=True,
+    #     trust_remote_code=True,
+    #     cache_dir="/mnt/NVME_A/transformers/",
+    #     # revision="81f4e2e37b278185863c9660a67201467c5691dc",
+    # )
 
     formatted_messages = f"""<s>[INST] <<SYS>>
         You are a helpful assistant.
