@@ -168,27 +168,27 @@ def main() -> None:
         print(f"{TColors.ENDC}")
 
 
-        # Ask the second model
-        # print("Second model response:")
-        # response: ChatResponse = chat(
-        #     model="llama3.1:8b-instruct-q4_K_M", messages=[
-        #         {
-        #             "role": "user",
-        #             "content": f"{question}",
-        #         },
-        #     ]
-        # )
-        with torch.no_grad():
-            inputs = tokenizer(formatted_messages, return_tensors="pt").to(device)
+        #Ask the second model
+        model_two_response: ChatResponse = chat(
+            model="hf.co/TheBloke/CodeLlama-7B-Instruct-GGUF",
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"{question}",
+                },
+            ],
+        )
+        # with torch.no_grad():
+        #     inputs = tokenizer(formatted_messages, return_tensors="pt").to(device)
 
-            outputs = alt_model.generate(
-                inputs=inputs.input_ids,
-                do_sample=True,
-                max_new_tokens=1024,
-            )
-            model_two_response = tokenizer.decode(
-                outputs.cpu()[0], skip_special_tokens=True
-            )
+        #     outputs = alt_model.generate(
+        #         inputs=inputs.input_ids,
+        #         do_sample=True,
+        #         max_new_tokens=1024,
+        #     )
+        #     model_two_response = tokenizer.decode(
+        #         outputs.cpu()[0], skip_special_tokens=True
+        #     )
 
         print(f"{TColors.OKCYAN}")
         print(model_two_response)
