@@ -74,7 +74,6 @@ def main() -> None:
 
     normal_model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(
         "codellama/CodeLlama-7b-Instruct-hf",
-        model_type="llama",
         gpu_layers=50,
         hf=True,
     )
@@ -84,7 +83,6 @@ def main() -> None:
     alt_model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(
         alt_model_id,
         gguf_file=alt_model_file,
-        model_type="llama",
         gpu_layers=50,
         hf=True,
     )
