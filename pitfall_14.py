@@ -74,8 +74,8 @@ def main() -> None:
 
     normal_model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(
         "codellama/CodeLlama-7b-Instruct-hf",
-        device_map="cuda",
         model_type="llama",
+        gpu_layers=50,
         hf=True,
     )
 
@@ -83,9 +83,10 @@ def main() -> None:
     alt_model_file = "codellama-7b-instruct.Q4_K_M.gguf"
     alt_model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(
         alt_model_id,
-        device_map="cuda",
         gguf_file=alt_model_file,
         model_type="llama",
+        gpu_layers=50,
+        hf=True,
     )
 
     formatted_messages = f"""<s>[INST] <<SYS>>
