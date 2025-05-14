@@ -20,7 +20,6 @@ from transformers import (
     pipeline,
 )
 from ctransformers import AutoModelForCausalLM as CAutoModelForCausalLM
-from ctransformers import AutoTokenizer as CAutoTokenizer
 
 from utils.colors import TColors
 from utils.attacks import jailbreak
@@ -99,8 +98,7 @@ def main() -> None:
         gpu_layers=500,
         hf=True,
     )
-    alt_tokenizer: CAutoTokenizer = CAutoTokenizer.from_pretrained(alt_model)
-    alt_pipe = pipeline("text-generation", model=alt_model, tokenizer=alt_tokenizer)
+    alt_pipe = pipeline("text-generation", model=alt_model, tokenizer=tokenizer)
 
     formatted_messages = f"""<s>[INST] <<SYS>>
         You are a helpful assistant.
