@@ -3,3 +3,4 @@ torch
 transformers
 datasets
 tqdm
+gguf>=0.10.0
