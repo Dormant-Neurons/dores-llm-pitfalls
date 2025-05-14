@@ -93,7 +93,7 @@ def main() -> None:
     alt_model_file = "codellama-7b-instruct.Q4_K_M.gguf"
     alt_model: CAutoModelForCausalLM = CAutoModelForCausalLM.from_pretrained(
         alt_model_id,
-        gguf_file=alt_model_file,
+        model_file=alt_model_file,
         gpu_layers=50,
         hf=True,
     )
