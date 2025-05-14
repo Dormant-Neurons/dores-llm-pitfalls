@@ -20,6 +20,7 @@ from transformers import (
     pipeline,
 )
 from ctransformers import AutoModelForCausalLM as CAutoModelForCausalLM
+from ctransformer import AutoConfig
 
 from utils.colors import TColors
 from utils.attacks import jailbreak
@@ -92,8 +93,13 @@ def main() -> None:
 
     alt_model_id = "TheBloke/CodeLlama-7B-Instruct-GGUF"
     alt_model_file = "codellama-7b-instruct.Q4_K_M.gguf"
+    alt_model_config = AutoConfig.from_pretrained(
+        alt_model_id,
+        max_seq_len=4096,
+    )
     alt_model: CAutoModelForCausalLM = CAutoModelForCausalLM.from_pretrained(
         alt_model_id,
+        config=alt_model_config,
         model_file=alt_model_file,
         gpu_layers=500,
         hf=True,
