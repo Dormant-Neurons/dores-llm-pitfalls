@@ -96,7 +96,7 @@ def main() -> None:
     alt_model: CAutoModelForCausalLM = CAutoModelForCausalLM.from_pretrained(
         alt_model_id,
         model_file=alt_model_file,
-        gpu_layers=50,
+        gpu_layers=500,
         hf=True,
     )
     alt_tokenizer: CAutoTokenizer = CAutoTokenizer.from_pretrained(alt_model)
@@ -156,6 +156,7 @@ def main() -> None:
         print(f"{TColors.ENDC}")
 
         model_two_response = alt_pipe(formatted_messages, max_new_tokens=1024, do_sample=True)
+        model_two_response = model_two_response[0]["generated_text"]
 
         print(f"{TColors.OKCYAN}")
         print(model_two_response)
