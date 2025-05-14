@@ -17,8 +17,10 @@ from ollama import chat, ChatResponse
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
+    pipeline,
 )
 from ctransformers import AutoModelForCausalLM as CAutoModelForCausalLM
+from ctransformers import AutoTokenizer as CAutoTokenizer
 
 from utils.colors import TColors
 from utils.attacks import jailbreak
@@ -97,6 +99,8 @@ def main() -> None:
         gpu_layers=50,
         hf=True,
     )
+    alt_tokenizer: CAutoTokenizer = CAutoTokenizer.from_pretrained(alt_model)
+    alt_pipe = pipeline("text-generation", model=alt_model, tokenizer=alt_tokenizer)
 
     formatted_messages = f"""<s>[INST] <<SYS>>
         You are a helpful assistant.
@@ -151,7 +155,7 @@ def main() -> None:
             print("NO MALICIOUS ANSWER DETECTED!")
         print(f"{TColors.ENDC}")
 
-        model_two_response = alt_model(formatted_messages)
+        model_two_response = alt_pipe(formatted_messages, max_new_tokens=1024, do_sample=True)
 
         print(f"{TColors.OKCYAN}")
         print(model_two_response)
