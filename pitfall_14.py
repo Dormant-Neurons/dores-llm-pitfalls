@@ -20,7 +20,7 @@ from transformers import (
     pipeline,
 )
 from ctransformers import AutoModelForCausalLM as CAutoModelForCausalLM
-from ctransformer import AutoConfig
+from ctransformers import AutoConfig
 
 from utils.colors import TColors
 from utils.attacks import jailbreak
