@@ -10,11 +10,13 @@ import psutil
 
 import torch
 from ollama import chat, ChatResponse
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    BitsAndBytesConfig,
-)
+# from transformers import (
+#     AutoModelForCausalLM,
+#     AutoTokenizer,
+#     BitsAndBytesConfig,
+# )
+
+from ctransformers import AutoModelForCausalLM, AutoTokenizer
 
 from utils.colors import TColors
 from utils.attacks import jailbreak
