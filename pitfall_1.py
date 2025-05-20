@@ -12,6 +12,7 @@ import torch
 from unsloth import FastLanguageModel, is_bfloat16_supported
 from trl import SFTTrainer
 from transformers import TrainingArguments
+from datasets import load_dataset
 
 from utils.colors import TColors
 
@@ -129,6 +130,8 @@ def main(device: str = "cpu") -> None:
         # load the dataset
         # for the first model the original dataset is used, then the generated dataset
         # is used for the next models
+        dataset = load_dataset("bigcode/self-oss-instruct-sc2-exec-filter-50k", split="train")
+        dataset.save_to_disk(DATASET_PATH)
         # TODO: implement the dataset loading
         dataset = None
 
@@ -182,8 +185,19 @@ def main(device: str = "cpu") -> None:
         print(f"Peak reserved memory % of max memory = {used_percentage} %.")
         print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.")
 
-        # save the model
-        model.save_pretrained_gguf(f"model_{i}", tokenizer, quantization_method="q4_k_m")
+        # save the model (both full precision and quantized)
+        model.save_pretrained_gguf(
+            f"{MODEL_PATH}/model_{i}_q4_k_m",
+            tokenizer,
+            quantization_method="q4_k_m"
+        )
+        trainer.model.save_pretrained(
+            f"{MODEL_PATH}/model_{i}_fp16",
+            safe_serialization=True,
+            save_adapter=True,
+            save_config=True,
+        )
+        trainer.tokenizer.save_pretrained(f"{MODEL_PATH}/model_{i}_q4_k_m")
 
         # use the model to generate the new dataset
         FastLanguageModel.for_inference(model)
