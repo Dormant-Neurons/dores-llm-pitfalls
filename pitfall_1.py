@@ -153,7 +153,7 @@ def main(device: str = "cpu", training_steps: int = 100, dataset_batch_size: int
     # the dataloader is later used for the generation of the new dataset
     original_dataloader = DataLoader(
         original_dataset.with_format("torch"),
-        batch_size=10,
+        batch_size=dataset_batch_size,
     )
     print(f"Original dataset length: {len(original_dataset)}")
 
