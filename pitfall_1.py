@@ -19,6 +19,7 @@ from datasets import load_dataset, Dataset
 from utils.colors import TColors
 
 MODEL_SPECIFIER: str = "unsloth/Qwen2.5-Coder-0.5B-Instruct"
+DATASET_SPECIFIER: str = "bigcode/self-oss-instruct-sc2-exec-filter-50k"
 MAX_SEQ_LENGTH: int = 4096
 NUM_TRAINING: int = 5
 MODEL_PATH: str = "./model_outputs/"
@@ -141,15 +142,15 @@ def main(device: str = "cpu", training_steps: int = 100) -> None:
 
     # load the dataset
     original_dataset = load_dataset(
-        "bigcode/self-oss-instruct-sc2-exec-filter-50k",
+        DATASET_SPECIFIER,
         split="train"
     )
+    original_dataset = original_dataset.select_columns(["prompt", "response"])
     original_dataset.save_to_disk(DATASET_PATH + "original_dataset")
     # the dataloader is later used for the generation of the new dataset
     original_dataloader = DataLoader(
         original_dataset.with_format("torch"),
         batch_size=10,
-        num_workers=4
     )
     print(f"Original dataset length: {len(original_dataset)}")
 
