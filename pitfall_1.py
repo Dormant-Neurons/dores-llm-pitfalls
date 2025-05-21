@@ -26,16 +26,24 @@ EOS_TOKEN: str = None # will be overwritten by the tokenizer
 
 def format_prompt(examples) -> dict:
     """format the dataset inputs for the trainer"""
-    return {
-        "messages": [
-            {
-                "role": "system",
-                "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.",
-            },
-            {"role": "user", "content": f"{examples["prompt"]}"},
-            {"role": "assistant", "content": f"{examples["response"]}"},
-        ]
-    }
+
+    user_inputs = examples["prompt"]
+    responses = examples["response"]
+
+    prompts = []
+
+    for user_input, response in zip(user_inputs, responses):
+        prompts.append({
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are Qwen, created by Alibaba. You are a helpful assistant.",
+                },
+                {"role": "user", "content": f"{user_input}"},
+                {"role": "assistant", "content": f"{response}"},
+            ]
+        })
+    return prompts
 
 
 def main(device: str = "cpu") -> None:
@@ -149,6 +157,8 @@ def main(device: str = "cpu") -> None:
         # is used for the next models
         dataset = load_dataset("bigcode/self-oss-instruct-sc2-exec-filter-50k", split="train")
         dataset.save_to_disk(DATASET_PATH)
+        dataset = dataset.map(format_prompt, batched=True)
+        print(format_prompt(dataset[0]))
         # TODO: implement the dataset loading
 
         # for some stats
@@ -161,10 +171,10 @@ def main(device: str = "cpu") -> None:
             model=model,
             tokenizer=tokenizer,
             train_dataset=dataset,
-            formatting_func=format_prompt,
+            #formatting_func=format_prompt,
             #dataset_text_field="text",
             max_seq_length=MAX_SEQ_LENGTH,
-            dataset_num_proc=2,
+            dataset_num_proc=4,
             packing=True,  # Can make training 5x faster for short sequences.
             args=TrainingArguments(
                 per_device_train_batch_size=2,
