@@ -136,7 +136,7 @@ def main(device: str = "cpu") -> None:
     # load the dataset
     original_dataset = load_dataset(
         "bigcode/self-oss-instruct-sc2-exec-filter-50k",
-        split="validation"
+        split="train"
     )
     original_dataset.save_to_disk(DATASET_PATH + "original_dataset")
     original_dataset_length = len(original_dataset)
