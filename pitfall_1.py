@@ -16,7 +16,7 @@ from datasets import load_dataset
 
 from utils.colors import TColors
 
-MODEL_SPECIFIER: str = "unsloth/Qwen2.5-Coder-0.5B-Instruct-GGUF"
+MODEL_SPECIFIER: str = "unsloth/Qwen2.5-Coder-0.5B-Instruct"
 MAX_SEQ_LENGTH: int = 4096
 NUM_TRAINING: int = 5
 MODEL_PATH: str = "./model_outputs/"
