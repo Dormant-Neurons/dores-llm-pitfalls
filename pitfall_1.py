@@ -133,6 +133,15 @@ def main(device: str = "cpu") -> None:
     # the model is trained for N times and after each training the dataset
     # is generated from the new model
 
+    # load the dataset
+    original_dataset = load_dataset(
+        "bigcode/self-oss-instruct-sc2-exec-filter-50k",
+        split="validation"
+    )
+    original_dataset.save_to_disk(DATASET_PATH + "original_dataset")
+    original_dataset_length = len(original_dataset)
+    print(f"Original dataset length: {original_dataset_length}")
+
     for i in range(NUM_TRAINING):
         # load the model
         model, tokenizer = FastLanguageModel.from_pretrained(
@@ -167,14 +176,17 @@ def main(device: str = "cpu") -> None:
         )
 
         # load the dataset
+        if i > 0:
+            # if the first training iteration is done, load the generated dataset from the disk
+            dataset = Dataset.load_from_disk(DATASET_PATH+f"generated_dataset_{i-1}")
+        else:
+            dataset = original_dataset
+
         # for the first model the original dataset is used, then the generated dataset
         # is used for the next models
-        dataset = load_dataset("bigcode/self-oss-instruct-sc2-exec-filter-50k", split="validation")
-        original_dataset_length = len(dataset)
-        print(f"Original dataset length: {original_dataset_length}")
-        dataset.save_to_disk(DATASET_PATH)
         dataset_train, dataset_val = make_splits(dataset)
-        dataset = dataset.map(format_prompt, batched=True)
+        dataset_train = dataset_train.map(format_prompt, batched=True)
+        dataset_val = dataset_val.map(format_prompt, batched=True)
 
         # for some stats
         gpu_stats = torch.cuda.get_device_properties(0)
