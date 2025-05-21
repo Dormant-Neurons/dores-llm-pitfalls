@@ -9,6 +9,7 @@ import datetime
 import argparse
 
 import torch
+from tqdm import tqdm
 from unsloth import FastLanguageModel, is_bfloat16_supported
 from trl import SFTTrainer
 from transformers import TrainingArguments
@@ -255,7 +256,7 @@ def main(device: str = "cpu") -> None:
 
         # ────────────────────────────── generate the new datasets ────────────────────────────
         new_data = []
-        for gen_iter, data in enumerate(original_dataset):
+        for gen_iter, data in tqdm(enumerate(original_dataset), total=len(original_dataset)):
             # generate a dataset with the same length as the original dataset
             if gen_iter >= len(original_dataset):
                 break
