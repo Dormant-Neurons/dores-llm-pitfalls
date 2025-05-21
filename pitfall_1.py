@@ -63,6 +63,7 @@ def make_splits(dataset) -> Dataset:
 def main(device: str = "cpu") -> None:
     """Main function to start the pitfall 1 fine-tuning"""
 
+    # ──────────────────────────── set devices and print informations ─────────────────────────
     # set the devices correctly
     if device == "cpu":
         device = torch.device("cpu")
@@ -128,7 +129,7 @@ def main(device: str = "cpu") -> None:
     )
     print("#" * os.get_terminal_size().columns + "\n")
 
-
+    # ───────────────────────── start the actual finetuning ──────────────────────────────
     # iterte over two loops: first the model training and then the dataset generation
     # the model is trained for N times and after each training the dataset
     # is generated from the new model
@@ -145,7 +146,7 @@ def main(device: str = "cpu") -> None:
     for i in range(NUM_TRAINING):
         # load the model
         model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=MODEL_SPECIFIER,
+            model_name=MODEL_SPECIFIER if i == 0 else f"{MODEL_PATH}/model_{i-1}_fp16",
             max_seq_length=MAX_SEQ_LENGTH,
             dtype=None,
             load_in_4bit=True,
@@ -209,7 +210,7 @@ def main(device: str = "cpu") -> None:
                 gradient_accumulation_steps=4,
                 warmup_steps=5,
                 # num_train_epochs = 1, # Set this for 1 full training run.
-                max_steps=60,
+                max_steps=5,
                 learning_rate=2e-4,
                 fp16=not is_bfloat16_supported(),
                 bf16=is_bfloat16_supported(),
@@ -241,11 +242,6 @@ def main(device: str = "cpu") -> None:
         print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.")
 
         # save the model (both full precision and quantized)
-        model.save_pretrained_gguf(
-            f"{MODEL_PATH}/model_{i}_q4_k_m",
-            tokenizer,
-            quantization_method="q4_k_m"
-        )
         trainer.model.save_pretrained(
             f"{MODEL_PATH}/model_{i}_fp16",
             safe_serialization=True,
@@ -257,7 +253,45 @@ def main(device: str = "cpu") -> None:
         # use the model to generate the new dataset
         FastLanguageModel.for_inference(model)
 
-        # TODO: Implement the dataset generation
+        # ────────────────────────────── generate the new datasets ────────────────────────────
+        new_data = []
+        for gen_iter, data in enumerate(original_dataset):
+            # generate a dataset with the same length as the original dataset
+            if gen_iter >= len(original_dataset):
+                break
+            question = data["prompt"]
+
+            # generate the answer using the model
+            inputs = tokenizer(
+                [
+                    f""""You are Qwen, created by Alibaba. You are a helpful assistant.
+
+                    ### Instruction:
+                    {question}"""
+                ],
+                return_tensors="pt",
+            ).to("cuda")
+
+            generated_answer = model.generate(
+                **inputs, max_new_tokens=4096, use_cache=True
+            )
+            generated_answer = tokenizer.batch_decode(
+                generated_answer, skip_special_tokens=True
+            )[0].split("### Response:")[-1].strip()
+
+            # add the generated answer to the dataset
+            new_data.append(
+                {
+                    "prompt": question,
+                    "response": generated_answer,
+                }
+            )
+        # save the new dataset to disk
+        new_dataset = Dataset.from_list(new_data)
+        new_dataset.save_to_disk(DATASET_PATH + f"generated_dataset_{i}")
+
+    # ────────────────── evaluate the models' perplexity and other metrics ─────────────────────────
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="pitfall_1")
