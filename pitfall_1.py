@@ -146,7 +146,11 @@ def main(device: str = "cpu", training_steps: int = 100) -> None:
     )
     original_dataset.save_to_disk(DATASET_PATH + "original_dataset")
     # the dataloader is later used for the generation of the new dataset
-    original_dataloader = DataLoader(original_dataset, batch_size=10)
+    original_dataloader = DataLoader(
+        original_dataset.with_format("torch"),
+        batch_size=10,
+        num_workers=4
+    )
     print(f"Original dataset length: {len(original_dataset)}")
 
     for i in range(NUM_TRAINING):
@@ -290,7 +294,7 @@ def main(device: str = "cpu", training_steps: int = 100) -> None:
                 **inputs,
                 max_new_tokens=MAX_SEQ_LENGTH,
                 use_cache=True,
-                temperature=0.1,
+                temperature=0.01,
 
             )
             generated_answers = tokenizer.batch_decode(
