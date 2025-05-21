@@ -150,7 +150,6 @@ def main(device: str = "cpu") -> None:
         dataset = load_dataset("bigcode/self-oss-instruct-sc2-exec-filter-50k", split="train")
         dataset.save_to_disk(DATASET_PATH)
         # TODO: implement the dataset loading
-        dataset = None
 
         # for some stats
         gpu_stats = torch.cuda.get_device_properties(0)
@@ -182,7 +181,7 @@ def main(device: str = "cpu") -> None:
                 lr_scheduler_type="linear",
                 seed=1337,
                 output_dir="outputs",
-                report_to="none",  # Use this for WandB etc
+                report_to="none",
             ),
         )
 
