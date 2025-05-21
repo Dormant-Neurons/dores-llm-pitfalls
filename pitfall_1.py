@@ -21,6 +21,21 @@ MAX_SEQ_LENGTH: int = 4096
 NUM_TRAINING: int = 5
 MODEL_PATH: str = "./model_outputs/"
 DATASET_PATH: str = "./generated_datasets/"
+EOS_TOKEN: str = None # will be overwritten by the tokenizer
+
+
+def format_prompt(examples) -> dict:
+    """format the dataset inputs for the trainer"""
+    return {
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.",
+            },
+            {"role": "user", "content": f"{examples['prompt']}"},
+            {"role": "assistant", "content": f"{examples['response']}"},
+        ]
+    }
 
 
 def main(device: str = "cpu") -> None:
@@ -104,6 +119,8 @@ def main(device: str = "cpu") -> None:
             dtype=None,
             load_in_4bit=True,
         )
+        global EOS_TOKEN
+        EOS_TOKEN = tokenizer.eos_token
 
         # add LoRA adapters
         model = FastLanguageModel.get_peft_model(
@@ -145,10 +162,10 @@ def main(device: str = "cpu") -> None:
             model=model,
             tokenizer=tokenizer,
             train_dataset=dataset,
-            dataset_text_field="text",
+            #dataset_text_field="text",
             max_seq_length=MAX_SEQ_LENGTH,
             dataset_num_proc=2,
-            packing=False,  # Can make training 5x faster for short sequences.
+            packing=True,  # Can make training 5x faster for short sequences.
             args=TrainingArguments(
                 per_device_train_batch_size=2,
                 gradient_accumulation_steps=4,
