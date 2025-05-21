@@ -259,7 +259,7 @@ def main(device: str = "cpu") -> None:
         new_data = []
         for gen_iter, data in tqdm(enumerate(original_dataset), total=len(original_dataset)):
             # generate a dataset with the same length as the original dataset
-            if gen_iter >= len(original_dataset):
+            if gen_iter >= 10: #len(original_dataset):
                 break
             question = data["prompt"]
 
@@ -281,8 +281,6 @@ def main(device: str = "cpu") -> None:
                 generated_answer, skip_special_tokens=True
             )[0].split("### Response:")[-1].strip()
 
-            print("\nQuestion: ", question)
-            print("Generated Answer: ", generated_answer)
             # add the generated answer to the dataset
             new_data.append(
                 {
