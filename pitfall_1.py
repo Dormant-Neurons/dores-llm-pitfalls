@@ -9,11 +9,12 @@ import datetime
 import argparse
 
 import torch
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 from unsloth import FastLanguageModel, is_bfloat16_supported
 from trl import SFTTrainer
 from transformers import TrainingArguments
-from datasets import load_dataset, Dataset, DataLoader
+from datasets import load_dataset, Dataset
 
 from utils.colors import TColors
 
