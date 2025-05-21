@@ -204,7 +204,7 @@ def main(device: str = "cpu") -> None:
             # formatting_func=format_prompt,
             dataset_text_field="text",
             max_seq_length=MAX_SEQ_LENGTH,
-            dataset_num_proc=4,
+            dataset_num_proc=8,
             packing=True,  # Can make training 5x faster for short sequences.
             args=TrainingArguments(
                 per_device_train_batch_size=2,
@@ -255,6 +255,7 @@ def main(device: str = "cpu") -> None:
         FastLanguageModel.for_inference(model)
 
         # ────────────────────────────── generate the new datasets ────────────────────────────
+        print(f"## {TColors.OKBLUE}{TColors.BOLD}Generate Dataset{TColors.ENDC}")
         new_data = []
         for gen_iter, data in tqdm(enumerate(original_dataset), total=len(original_dataset)):
             # generate a dataset with the same length as the original dataset
@@ -274,7 +275,7 @@ def main(device: str = "cpu") -> None:
             ).to("cuda")
 
             generated_answer = model.generate(
-                **inputs, max_new_tokens=4096, use_cache=True
+                **inputs, max_new_tokens=MAX_SEQ_LENGTH, use_cache=True
             )
             generated_answer = tokenizer.batch_decode(
                 generated_answer, skip_special_tokens=True
@@ -294,6 +295,7 @@ def main(device: str = "cpu") -> None:
         new_dataset.save_to_disk(DATASET_PATH + f"generated_dataset_{i}")
 
     # ────────────────── evaluate the models' perplexity and other metrics ─────────────────────────
+    # TODO: implement the evaluation of the models' perplexity and other metrics
 
 
 if __name__ == "__main__":
