@@ -32,8 +32,8 @@ def format_prompt(examples) -> dict:
                 "role": "system",
                 "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.",
             },
-            {"role": "user", "content": f"{examples['prompt']}"},
-            {"role": "assistant", "content": f"{examples['response']}"},
+            {"role": "user", "content": f"{examples["prompt"]}"},
+            {"role": "assistant", "content": f"{examples["response"]}"},
         ]
     }
 
@@ -162,6 +162,7 @@ def main(device: str = "cpu") -> None:
             model=model,
             tokenizer=tokenizer,
             train_dataset=dataset,
+            formatting_func=format_prompt,
             #dataset_text_field="text",
             max_seq_length=MAX_SEQ_LENGTH,
             dataset_num_proc=2,
