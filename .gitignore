@@ -1,3 +1,11 @@
+# project specific
+outputs/
+generated_datasets/
+unsloth_compiled_cache/
+_unsloth_sentencepiece_temp/
+llama.cpp/
+model_outputs/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
