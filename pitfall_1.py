@@ -63,7 +63,7 @@ def make_splits(dataset) -> Dataset:
     return train_dataset, val_dataset
 
 
-def main(device: str = "cpu", training_steps: int = 100) -> None:
+def main(device: str = "cpu", training_steps: int = 100, dataset_batch_size: int = 10) -> None:
     """Main function to start the pitfall 1 fine-tuning"""
 
     # ──────────────────────────── set devices and print informations ─────────────────────────
@@ -126,6 +126,9 @@ def main(device: str = "cpu", training_steps: int = 100) -> None:
     )
     print(
         f"## {TColors.OKBLUE}{TColors.BOLD}Training Steps{TColors.ENDC}: {training_steps}"
+    )
+    print(
+        f"## {TColors.OKBLUE}{TColors.BOLD}Dataset Batch Size{TColors.ENDC}: {dataset_batch_size}"
     )
     print(
         f"## {TColors.OKBLUE}{TColors.BOLD}Model Saving Path{TColors.ENDC}: {MODEL_PATH}"
@@ -276,12 +279,12 @@ def main(device: str = "cpu", training_steps: int = 100) -> None:
 
             # tokenize the data batch
             inputs = []
-            for data in data_batch:
+            for data in data_batch["prompt"]:
                 inputs.append(
                     f""""You are Qwen, created by Alibaba. You are a helpful assistant.
 
                     ### Instruction:
-                    {data["prompt"]}"""
+                    {data}"""
                 )
             # generate the answer using the model
             inputs = tokenizer(
@@ -344,6 +347,13 @@ if __name__ == "__main__":
         type=int,
         default=100,
         help="specifies the number of training steps to run",
+    )
+    parser.add_argument(
+        "--dataset_batch_size",
+        "-dbs",
+        type=int,
+        default=10,
+        help="specifies the batch size for the dataset",
     )
     args = parser.parse_args()
     main(**vars(args))
