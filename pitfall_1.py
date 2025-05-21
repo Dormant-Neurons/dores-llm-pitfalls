@@ -13,7 +13,7 @@ from tqdm import tqdm
 from unsloth import FastLanguageModel, is_bfloat16_supported
 from trl import SFTTrainer
 from transformers import TrainingArguments
-from datasets import load_dataset, Dataset
+from datasets import load_dataset, Dataset, DataLoader
 
 from utils.colors import TColors
 
@@ -144,6 +144,8 @@ def main(device: str = "cpu", training_steps: int = 100) -> None:
         split="train"
     )
     original_dataset.save_to_disk(DATASET_PATH + "original_dataset")
+    # the dataloader is later used for the generation of the new dataset
+    original_dataloader = DataLoader(original_dataset, batch_size=10)
     print(f"Original dataset length: {len(original_dataset)}")
 
     for i in range(NUM_TRAINING):
@@ -259,37 +261,60 @@ def main(device: str = "cpu", training_steps: int = 100) -> None:
         # ────────────────────────────── generate the new datasets ────────────────────────────
         print(f"## {TColors.OKBLUE}{TColors.BOLD}Generate Dataset{TColors.ENDC}")
         new_data = []
-        for gen_iter, data in tqdm(enumerate(original_dataset), total=len(original_dataset)):
+        for gen_iter, data_batch in tqdm(
+            enumerate(original_dataloader), total=len(original_dataloader)
+        ):
             # generate a dataset with the same length as the original dataset
-            if gen_iter >= len(original_dataset):
+            if gen_iter >= len(original_dataloader):
                 break
-            question = data["prompt"]
 
-            # generate the answer using the model
-            inputs = tokenizer(
-                [
+            # tokenize the data batch
+            inputs = []
+            for data in data_batch:
+                inputs.append(
                     f""""You are Qwen, created by Alibaba. You are a helpful assistant.
 
                     ### Instruction:
-                    {question}"""
-                ],
+                    {data["prompt"]}"""
+                )
+            # generate the answer using the model
+            inputs = tokenizer(
+                inputs,
+                padding=True,
+                truncation=True,
                 return_tensors="pt",
             ).to("cuda")
 
-            generated_answer = model.generate(
-                **inputs, max_new_tokens=MAX_SEQ_LENGTH, use_cache=True
+            generated_answers = model.generate(
+                **inputs,
+                max_new_tokens=MAX_SEQ_LENGTH,
+                use_cache=True,
+                temperature=0.1,
+
             )
-            generated_answer = tokenizer.batch_decode(
-                generated_answer, skip_special_tokens=True
-            )[0].split("### Response:")[-1].strip()
+            generated_answers = tokenizer.batch_decode(
+                generated_answers, skip_special_tokens=True
+            )[0]
+            print("Generated Answers: ", generated_answers)
 
             # add the generated answer to the dataset
-            new_data.append(
-                {
-                    "prompt": question,
-                    "response": generated_answer,
-                }
-            )
+            for generated_answer, data in zip(generated_answers, data_batch):
+                generated_answer = generated_answer.split("### Instruction:")[-1].strip()
+                question = data_batch["prompt"]
+                # add the generated answer to the dataset
+                if len(generated_answer) == 0:
+                    continue
+                if len(question) == 0:
+                    continue
+                print("Question: ", question)
+                print("Generated Answer: ", generated_answer)
+                # add the generated answer to the dataset
+                new_data.append(
+                    {
+                        "prompt": question,
+                        "response": generated_answer,
+                    }
+                )
         # save the new dataset to disk
         new_dataset = Dataset.from_list(new_data)
         new_dataset.save_to_disk(DATASET_PATH + f"generated_dataset_{i}")
