@@ -61,7 +61,7 @@ def make_splits(dataset) -> Dataset:
     return train_dataset, val_dataset
 
 
-def main(device: str = "cpu") -> None:
+def main(device: str = "cpu", training_steps: int = 100) -> None:
     """Main function to start the pitfall 1 fine-tuning"""
 
     # ──────────────────────────── set devices and print informations ─────────────────────────
@@ -123,6 +123,9 @@ def main(device: str = "cpu") -> None:
         f"## {TColors.OKBLUE}{TColors.BOLD}MAX_SEQ_LENGTH{TColors.ENDC}: {MAX_SEQ_LENGTH}"
     )
     print(
+        f"## {TColors.OKBLUE}{TColors.BOLD}Training Steps{TColors.ENDC}: {training_steps}"
+    )
+    print(
         f"## {TColors.OKBLUE}{TColors.BOLD}Model Saving Path{TColors.ENDC}: {MODEL_PATH}"
     )
     print(
@@ -141,8 +144,7 @@ def main(device: str = "cpu") -> None:
         split="train"
     )
     original_dataset.save_to_disk(DATASET_PATH + "original_dataset")
-    original_dataset_length = len(original_dataset)
-    print(f"Original dataset length: {original_dataset_length}")
+    print(f"Original dataset length: {len(original_dataset)}")
 
     for i in range(NUM_TRAINING):
         # load the model
@@ -211,7 +213,7 @@ def main(device: str = "cpu") -> None:
                 gradient_accumulation_steps=4,
                 warmup_steps=5,
                 # num_train_epochs = 1, # Set this for 1 full training run.
-                max_steps=5,
+                max_steps=training_steps,
                 learning_rate=2e-4,
                 fp16=not is_bfloat16_supported(),
                 bf16=is_bfloat16_supported(),
@@ -259,7 +261,7 @@ def main(device: str = "cpu") -> None:
         new_data = []
         for gen_iter, data in tqdm(enumerate(original_dataset), total=len(original_dataset)):
             # generate a dataset with the same length as the original dataset
-            if gen_iter >= 10: #len(original_dataset):
+            if gen_iter >= len(original_dataset):
                 break
             question = data["prompt"]
 
@@ -304,6 +306,13 @@ if __name__ == "__main__":
         type=str,
         default="cpu",
         help="specifies the device to run the computations on (cpu, cuda, mps)",
+    )
+    parser.add_argument(
+        "--training_steps",
+        "-ts",
+        type=int,
+        default=100,
+        help="specifies the number of training steps to run",
     )
     args = parser.parse_args()
     main(**vars(args))
