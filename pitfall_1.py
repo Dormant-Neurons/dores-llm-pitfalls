@@ -12,7 +12,7 @@ import torch
 from unsloth import FastLanguageModel, is_bfloat16_supported
 from trl import SFTTrainer
 from transformers import TrainingArguments
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
 
 from utils.colors import TColors
 
@@ -44,18 +44,20 @@ def format_prompt(examples) -> dict:
         )
 
     return {"text": prompts}
-    # for user_input, response in zip(user_inputs, responses):
-    #     prompts.append({
-    #         "messages": [
-    #             {
-    #                 "role": "system",
-    #                 "content": "You are Qwen, created by Alibaba. You are a helpful assistant.",
-    #             },
-    #             {"role": "user", "content": f"{user_input}"},
-    #             {"role": "assistant", "content": f"{response}"},
-    #         ]
-    #     })
-    # return prompts
+
+
+def make_splits(dataset) -> Dataset:
+    """Splits the dataset into training and validation sets"""
+
+    # shuffle the dataset
+    dataset = dataset.shuffle(seed=42)
+
+    # split the dataset into training and validation sets
+    train_size = int(0.8 * len(dataset))
+    train_dataset = dataset.select(range(train_size))
+    val_dataset = dataset.select(range(train_size, len(dataset)))
+
+    return train_dataset, val_dataset
 
 
 def main(device: str = "cpu") -> None:
@@ -167,10 +169,12 @@ def main(device: str = "cpu") -> None:
         # load the dataset
         # for the first model the original dataset is used, then the generated dataset
         # is used for the next models
-        dataset = load_dataset("bigcode/self-oss-instruct-sc2-exec-filter-50k", split="train")
+        dataset = load_dataset("bigcode/self-oss-instruct-sc2-exec-filter-50k", split="validation")
+        original_dataset_length = len(dataset)
+        print(f"Original dataset length: {original_dataset_length}")
         dataset.save_to_disk(DATASET_PATH)
+        dataset_train, dataset_val = make_splits(dataset)
         dataset = dataset.map(format_prompt, batched=True)
-        # TODO: implement the dataset loading
 
         # for some stats
         gpu_stats = torch.cuda.get_device_properties(0)
@@ -181,8 +185,9 @@ def main(device: str = "cpu") -> None:
         trainer = SFTTrainer(
             model=model,
             tokenizer=tokenizer,
-            train_dataset=dataset,
-            #formatting_func=format_prompt,
+            train_dataset=dataset_train,
+            validation_dataset=dataset_val,
+            # formatting_func=format_prompt,
             dataset_text_field="text",
             max_seq_length=MAX_SEQ_LENGTH,
             dataset_num_proc=4,
