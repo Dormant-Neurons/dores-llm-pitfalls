@@ -372,7 +372,7 @@ def main(device: str = "cpu", training_steps: int = 100, dataset_batch_size: int
         # calculate the perplexity for the generated dataset
         ppl_dataloader = DataLoader(
             ppl_dataset.with_format("torch"),
-            batch_size=dataset_batch_size,
+            batch_size=1,
         )
 
         # calculate the perplexity for every datapoint in the dataset
