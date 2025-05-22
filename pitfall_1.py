@@ -28,7 +28,7 @@ DATASET_PATH: str = "./generated_datasets/"
 EOS_TOKEN: str = None # will be overwritten by the tokenizer
 
 
-def format_prompt(examples) -> dict:
+def format_prompt(examples: dict) -> dict:
     """format the dataset inputs for the trainer"""
 
     user_inputs = examples["instruction"]
@@ -50,7 +50,7 @@ def format_prompt(examples) -> dict:
     return {"text": prompts}
 
 
-def make_splits(dataset) -> Dataset:
+def make_splits(dataset: Dataset) -> Dataset:
     """Splits the dataset into training and validation sets"""
 
     # shuffle the dataset
@@ -64,8 +64,23 @@ def make_splits(dataset) -> Dataset:
     return train_dataset, val_dataset
 
 
-def main(device: str = "cpu", training_steps: int = 100, dataset_batch_size: int = 10) -> None:
-    """Main function to start the pitfall 1 fine-tuning"""
+def main(
+    device: str = "cpu",
+    training_epochs: int = 100,
+    dataset_batch_size: int = 10,
+    training_batch_size: int = 8,
+) -> None:
+    """
+    Main function to start the pitfall 1 fine-tuning
+    
+    Args:
+        device (str): device to run the computations on (cpu, cuda, mps)
+        training_epochs (int): number of training epochs to run
+        dataset_batch_size (int): batch size for the dataset
+
+    Returns:
+        None
+    """
 
     # ──────────────────────────── set devices and print informations ─────────────────────────
     # set the devices correctly
@@ -126,7 +141,7 @@ def main(device: str = "cpu", training_steps: int = 100, dataset_batch_size: int
         f"## {TColors.OKBLUE}{TColors.BOLD}MAX_SEQ_LENGTH{TColors.ENDC}: {MAX_SEQ_LENGTH}"
     )
     print(
-        f"## {TColors.OKBLUE}{TColors.BOLD}Training Steps{TColors.ENDC}: {training_steps}"
+        f"## {TColors.OKBLUE}{TColors.BOLD}Training Steps{TColors.ENDC}: {training_epochs}"
     )
     print(
         f"## {TColors.OKBLUE}{TColors.BOLD}Dataset Batch Size{TColors.ENDC}: {dataset_batch_size}"
@@ -221,11 +236,11 @@ def main(device: str = "cpu", training_steps: int = 100, dataset_batch_size: int
             dataset_num_proc=8,
             packing=True,  # Can make training 5x faster for short sequences.
             args=TrainingArguments(
-                per_device_train_batch_size=2,
                 gradient_accumulation_steps=4,
                 warmup_steps=5,
-                # num_train_epochs = 1, # Set this for 1 full training run.
-                max_steps=training_steps,
+                num_train_epochs=training_epochs,
+                per_device_train_batch_size=training_batch_size,
+                per_device_eval_batch_size=training_batch_size,
                 learning_rate=2e-4,
                 fp16=not is_bfloat16_supported(),
                 bf16=is_bfloat16_supported(),
@@ -422,11 +437,11 @@ if __name__ == "__main__":
         help="specifies the device to run the computations on (cpu, cuda, mps)",
     )
     parser.add_argument(
-        "--training_steps",
-        "-ts",
+        "--training_epochs",
+        "-te",
         type=int,
-        default=100,
-        help="specifies the number of training steps to run",
+        default=1,
+        help="specifies the number of training epochs to run",
     )
     parser.add_argument(
         "--dataset_batch_size",
@@ -434,6 +449,13 @@ if __name__ == "__main__":
         type=int,
         default=10,
         help="specifies the batch size for the dataset",
+    )
+    parser.add_argument(
+        "--training_batch_size",
+        "-tbs",
+        type=int,
+        default=8,
+        help="specifies the batch size for the training/eval",
     )
     args = parser.parse_args()
     main(**vars(args))
