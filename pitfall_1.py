@@ -30,7 +30,7 @@ EOS_TOKEN: str = None # will be overwritten by the tokenizer
 def format_prompt(examples) -> dict:
     """format the dataset inputs for the trainer"""
 
-    user_inputs = examples["prompt"]
+    user_inputs = examples["instruction"]
     responses = examples["response"]
 
     prompts = []
@@ -148,7 +148,7 @@ def main(device: str = "cpu", training_steps: int = 100, dataset_batch_size: int
         DATASET_SPECIFIER,
         split="train"
     )
-    original_dataset = original_dataset.select_columns(["prompt", "response"])
+    original_dataset = original_dataset.select_columns(["instruction", "response"])
     original_dataset.save_to_disk(DATASET_PATH + "original_dataset")
     # the dataloader is later used for the generation of the new dataset
     original_dataloader = DataLoader(
@@ -279,7 +279,7 @@ def main(device: str = "cpu", training_steps: int = 100, dataset_batch_size: int
 
             # tokenize the data batch
             inputs = []
-            for data in data_batch["prompt"]:
+            for data in data_batch["instruction"]:
                 inputs.append(
                     f""""You are Qwen, created by Alibaba. You are a helpful assistant.
 
@@ -304,19 +304,19 @@ def main(device: str = "cpu", training_steps: int = 100, dataset_batch_size: int
             generated_answers = tokenizer.batch_decode(
                 generated_answers, skip_special_tokens=True
             )[0]
-            print("Generated Answers: ", generated_answers)
 
             # add the generated answer to the dataset
-            for generated_answer, data in zip(generated_answers, data_batch):
+            for generated_answer, data in zip(
+                generated_answers, data_batch["instruction"]
+            ):
                 generated_answer = generated_answer.split("### Instruction:")[-1].strip()
-                question = data_batch["prompt"]
+                question = data
                 # add the generated answer to the dataset
                 if len(generated_answer) == 0:
                     continue
                 if len(question) == 0:
                     continue
-                print("Question: ", question)
-                print("Generated Answer: ", generated_answer)
+
                 # add the generated answer to the dataset
                 new_data.append(
                     {
