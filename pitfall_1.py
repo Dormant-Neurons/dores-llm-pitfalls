@@ -20,7 +20,7 @@ from utils.colors import TColors
 
 MODEL_SPECIFIER: str = "unsloth/Qwen2.5-Coder-0.5B-Instruct"
 DATASET_SPECIFIER: str = "bigcode/self-oss-instruct-sc2-exec-filter-50k"
-MAX_SEQ_LENGTH: int = 4096
+MAX_SEQ_LENGTH: int = 1024
 NUM_TRAINING: int = 5
 MODEL_PATH: str = "./model_outputs/"
 DATASET_PATH: str = "./generated_datasets/"
