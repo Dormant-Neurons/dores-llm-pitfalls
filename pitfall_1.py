@@ -264,7 +264,20 @@ def main(device: str = "cpu", training_steps: int = 100, dataset_batch_size: int
         )
         trainer.tokenizer.save_pretrained(f"{MODEL_PATH}/model_{i}_q4_k_m")
 
+        del trainer
+        del model
+        del tokenizer
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
+
         # use the model to generate the new dataset
+        # for this the model is loaded again with the quantized weights
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=f"{MODEL_PATH}/model_{i}_fp16",
+            max_seq_length=MAX_SEQ_LENGTH,
+            dtype=None,
+            load_in_4bit=True,
+        )
         FastLanguageModel.for_inference(model)
 
         # ────────────────────────────── generate the new datasets ────────────────────────────
@@ -321,9 +334,6 @@ def main(device: str = "cpu", training_steps: int = 100, dataset_batch_size: int
                     continue
                 if len(question) == 0:
                     continue
-
-                print("Question: ", question)
-                print("Generated Answer: ", generated_answer)
 
                 # add the generated answer to the dataset
                 new_data.append(
