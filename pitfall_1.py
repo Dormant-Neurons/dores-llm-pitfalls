@@ -256,7 +256,7 @@ def main(device: str = "cpu", training_steps: int = 100, dataset_batch_size: int
         print(f"Peak reserved memory % of max memory = {used_percentage} %.")
         print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.")
 
-        # save the model (both full precision and quantized)
+        # save the model
         trainer.model.save_pretrained(
             f"{MODEL_PATH}/model_{i}_fp16",
             safe_serialization=True,
@@ -390,7 +390,7 @@ def main(device: str = "cpu", training_steps: int = 100, dataset_batch_size: int
                 outputs = model(**inputs, labels=inputs["input_ids"])
                 loss = outputs.loss
                 perplexity = torch.exp(loss)
-                perplexity_dict[f"generation_{i}"].append(perplexity.item())
+                perplexity_dict[f"Generation {i}"].append(perplexity.item())
                 all_perplexities.append(perplexity.item())
 
     #min_perplexity = min(all_perplexities)
@@ -409,6 +409,8 @@ def main(device: str = "cpu", training_steps: int = 100, dataset_batch_size: int
     plt.tight_layout()
     plt.savefig("perplexity_histogram.png")
 
+    print(f"## {TColors.OKBLUE}{TColors.BOLD}Saved the histogram under: " \
+          f"{TColors.HEADER}./perplexity_histogram.png{TColors.ENDC}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="pitfall_1")
