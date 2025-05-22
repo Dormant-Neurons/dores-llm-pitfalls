@@ -10,6 +10,7 @@ import argparse
 
 import torch
 from torch.utils.data import DataLoader
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 from unsloth import FastLanguageModel, is_bfloat16_supported
 from trl import SFTTrainer
@@ -262,7 +263,7 @@ def main(device: str = "cpu", training_steps: int = 100, dataset_batch_size: int
             save_adapter=True,
             save_config=True,
         )
-        trainer.tokenizer.save_pretrained(f"{MODEL_PATH}/model_{i}_q4_k_m")
+        trainer.tokenizer.save_pretrained(f"{MODEL_PATH}/model_{i}_fp16")
 
         del trainer
         del model
@@ -347,7 +348,61 @@ def main(device: str = "cpu", training_steps: int = 100, dataset_batch_size: int
         new_dataset.save_to_disk(DATASET_PATH + f"generated_dataset_{i}")
 
     # ────────────────── evaluate the models' perplexity and other metrics ─────────────────────────
-    # TODO: implement the evaluation of the models' perplexity and other metrics
+    # iterate over every model and the generated dataset and calculate the perplexity
+    # for the perplexity, every datapoint i.e., the generated answer for every question
+    # is evaluated to get the probability for a given perplexity over the whole dataset
+
+    perplexity_dict = {}
+
+    for i in range(NUM_TRAINING):
+        # add new entry to the dict
+        perplexity_dict[f"generation_{i}"] = []
+        # load the model
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=f"{MODEL_PATH}/model_{i}_fp16",
+            max_seq_length=MAX_SEQ_LENGTH,
+            dtype=None,
+            load_in_4bit=True,
+        )
+        FastLanguageModel.for_inference(model)
+
+        # load the dataset
+        ppl_dataset = Dataset.load_from_disk(DATASET_PATH+f"generated_dataset_{i}")
+
+        # calculate the perplexity for the generated dataset
+        ppl_dataloader = DataLoader(
+            ppl_dataset.with_format("torch"),
+            batch_size=dataset_batch_size,
+        )
+
+        # calculate the perplexity for every datapoint in the dataset
+        for data_batch in tqdm(ppl_dataloader):
+            inputs = tokenizer(
+                data_batch["instruction"],
+                padding=True,
+                truncation=True,
+                return_tensors="pt",
+            ).to("cuda")
+
+            # calculate the perplexity for every datapoint in the dataset
+            with torch.no_grad():
+                outputs = model(**inputs, labels=inputs["input_ids"])
+                loss = outputs.loss
+                perplexity = torch.exp(loss)
+                perplexity_dict[f"generation_{i}"].append(perplexity.item())
+
+
+    # plot the perplexity for every model as a histogram
+    for name, perplexities in perplexity_dict.items():
+        plt.hist(perplexities, bins=10, density=True, alpha=0.5, label=name, edgecolor="black")
+
+    plt.xlabel("Perplexity")
+    plt.ylabel("Probability")
+    plt.title("Perplexity of generated datapoints over several generations")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("perplexity_histogram.png")
 
 
 if __name__ == "__main__":
