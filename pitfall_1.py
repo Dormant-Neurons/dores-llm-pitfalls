@@ -303,24 +303,32 @@ def main(device: str = "cpu", training_steps: int = 100, dataset_batch_size: int
             )
             generated_answers = tokenizer.batch_decode(
                 generated_answers, skip_special_tokens=True
-            )[0]
+            )
 
             # add the generated answer to the dataset
             for generated_answer, data in zip(
                 generated_answers, data_batch["instruction"]
             ):
-                generated_answer = generated_answer.split("### Instruction:")[-1].strip()
-                question = data
+                question = f""""You are Qwen, created by Alibaba. You are a helpful assistant.
+
+                    ### Instruction:
+                    {data}"""
+
+                # remove the prompt from the generated answer
+                generated_answer = generated_answer.replace(question, "").strip()
                 # add the generated answer to the dataset
                 if len(generated_answer) == 0:
                     continue
                 if len(question) == 0:
                     continue
 
+                print("Question: ", question)
+                print("Generated Answer: ", generated_answer)
+
                 # add the generated answer to the dataset
                 new_data.append(
                     {
-                        "prompt": question,
+                        "instruction": question,
                         "response": generated_answer,
                     }
                 )
