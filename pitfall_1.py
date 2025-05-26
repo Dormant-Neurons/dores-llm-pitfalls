@@ -22,7 +22,6 @@ from utils.colors import TColors
 MODEL_SPECIFIER: str = "unsloth/Qwen2.5-Coder-0.5B-Instruct"
 DATASET_SPECIFIER: str = "bigcode/self-oss-instruct-sc2-exec-filter-50k"
 MAX_SEQ_LENGTH: int = 2048
-NUM_TRAINING: int = 5
 MODEL_PATH: str = "./model_outputs/"
 DATASET_PATH: str = "./generated_datasets/"
 EOS_TOKEN: str = None # will be overwritten by the tokenizer
@@ -66,10 +65,11 @@ def make_splits(dataset: Dataset) -> Dataset:
 
 def main(
     device: str = "cpu",
-    training_epochs: int = 100,
+    training_epochs: int = 5,
     dataset_batch_size: int = 10,
     training_batch_size: int = 8,
     skip_training: bool = False,
+    num_generations: int = 5,
 ) -> None:
     """
     Main function to start the pitfall 1 fine-tuning
@@ -80,6 +80,7 @@ def main(
         dataset_batch_size (int): batch size for the dataset
         training_batch_size (int): batch size for the training/eval
         skip_training (bool): if True, skip the training and only evaluate the models
+        num_generations (int): number of generations to run (default: 5)
 
     Returns:
         None
@@ -138,7 +139,7 @@ def main(
         + "#" * (os.get_terminal_size().columns - 14)
     )
     print(
-        f"## {TColors.OKBLUE}{TColors.BOLD}Number of Training Loops{TColors.ENDC}: {NUM_TRAINING}"
+        f"## {TColors.OKBLUE}{TColors.BOLD}Number of Generations{TColors.ENDC}: {num_generations}"
     )
     print(
         f"## {TColors.OKBLUE}{TColors.BOLD}MAX_SEQ_LENGTH{TColors.ENDC}: {MAX_SEQ_LENGTH}"
@@ -183,7 +184,7 @@ def main(
         )
         print(f"Original dataset length: {len(original_dataset)}")
 
-        for i in range(NUM_TRAINING):
+        for i in range(num_generations):
             # load the model
             model, tokenizer = FastLanguageModel.from_pretrained(
                 model_name=MODEL_SPECIFIER if i == 0 else f"{MODEL_PATH}/model_{i-1}_fp16",
@@ -394,7 +395,7 @@ def main(
         batch_size=1,
     )
 
-    for i in range(NUM_TRAINING):
+    for i in range(num_generations):
         # add new entry to the dict
         perplexity_dict[f"Generation {i}"] = []
         # load the model
@@ -455,14 +456,14 @@ if __name__ == "__main__":
         "--training_epochs",
         "-te",
         type=int,
-        default=1,
+        default=5,
         help="specifies the number of training epochs to run",
     )
     parser.add_argument(
         "--dataset_batch_size",
         "-dbs",
         type=int,
-        default=10,
+        default=30,
         help="specifies the batch size for the dataset",
     )
     parser.add_argument(
@@ -477,6 +478,13 @@ if __name__ == "__main__":
         "-st",
         action="store_true",
         help="if set, skip the training and only evaluate the models",
+    )
+    parser.add_argument(
+        "--num_generations",
+        "-ng",
+        type=int,
+        default=5,
+        help="specifies the number of generations to run (default: 5)",
     )
     args = parser.parse_args()
     main(**vars(args))
