@@ -380,6 +380,20 @@ def main(
     perplexity_dict = {}
     all_perplexities = []
 
+    # load the original dataset but use only the non-train questions
+    # load the dataset
+    ppl_dataset = load_dataset(
+        DATASET_SPECIFIER,
+        split="train"
+    )
+    ppl_dataset = original_dataset.select_columns(["instruction", "response"])
+    _, ppl_dataset_val = make_splits(ppl_dataset)
+
+    ppl_dataloader = DataLoader(
+        ppl_dataset_val.with_format("torch"),
+        batch_size=1,
+    )
+
     for i in range(NUM_TRAINING):
         # add new entry to the dict
         perplexity_dict[f"Generation {i}"] = []
@@ -392,16 +406,7 @@ def main(
         )
         FastLanguageModel.for_inference(model)
 
-        # load the dataset
-        ppl_dataset = Dataset.load_from_disk(DATASET_PATH+f"generated_dataset_{i}")
-
-        # calculate the perplexity for the generated dataset
-        ppl_dataloader = DataLoader(
-            ppl_dataset.with_format("torch"),
-            batch_size=1,
-        )
-
-        # calculate the perplexity for every datapoint in the dataset
+        # calculate the perplexity for every datapoint in the dataset (eval)
         for data_batch in tqdm(ppl_dataloader):
             inputs = tokenizer(
                 data_batch["instruction"],
