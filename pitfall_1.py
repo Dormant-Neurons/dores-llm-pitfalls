@@ -426,7 +426,7 @@ def main(
 
     min_perplexity = min(all_perplexities)
     max_perplexity = max(all_perplexities)
-    bins = torch.linspace(min_perplexity, max_perplexity, 1001)
+    bins = torch.linspace(min_perplexity, max_perplexity, len(ppl_dataset_val)+1)
 
     plt.figure(figsize=(14, 8))
     # plot the perplexity for every model as a histogram
