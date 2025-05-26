@@ -418,14 +418,14 @@ def main(
                 perplexity_dict[f"Generation {i}"].append(perplexity.item())
                 all_perplexities.append(perplexity.item())
 
-    #min_perplexity = min(all_perplexities)
-    #max_perplexity = max(all_perplexities)
-    #bins = torch.linspace(min_perplexity, max_perplexity, 101)
+    min_perplexity = min(all_perplexities)
+    max_perplexity = max(all_perplexities)
+    bins = torch.linspace(min_perplexity, max_perplexity, 1001)
 
     plt.figure(figsize=(14, 8))
     # plot the perplexity for every model as a histogram
     for name, perplexities in perplexity_dict.items():
-        plt.hist(perplexities, density=True, alpha=0.35, label=name)
+        plt.hist(perplexities, bins=bins, density=True, alpha=0.35, label=name)
 
     plt.xlabel("Perplexity")
     plt.ylabel("Probability")
