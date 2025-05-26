@@ -387,7 +387,7 @@ def main(
         DATASET_SPECIFIER,
         split="train"
     )
-    ppl_dataset = original_dataset.select_columns(["instruction", "response"])
+    ppl_dataset = ppl_dataset.select_columns(["instruction", "response"])
     _, ppl_dataset_val = make_splits(ppl_dataset)
 
     ppl_dataloader = DataLoader(
