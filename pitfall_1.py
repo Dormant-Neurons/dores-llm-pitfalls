@@ -372,7 +372,7 @@ def main(
 
     for i in range(NUM_TRAINING):
         # add new entry to the dict
-        perplexity_dict[f"generation_{i}"] = []
+        perplexity_dict[f"Generation {i}"] = []
         # load the model
         model, tokenizer = FastLanguageModel.from_pretrained(
             model_name=f"{MODEL_PATH}/model_{i}_fp16",
