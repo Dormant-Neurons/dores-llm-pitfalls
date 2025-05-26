@@ -69,6 +69,7 @@ def main(
     training_epochs: int = 100,
     dataset_batch_size: int = 10,
     training_batch_size: int = 8,
+    skip_training: bool = False,
 ) -> None:
     """
     Main function to start the pitfall 1 fine-tuning
@@ -77,6 +78,8 @@ def main(
         device (str): device to run the computations on (cpu, cuda, mps)
         training_epochs (int): number of training epochs to run
         dataset_batch_size (int): batch size for the dataset
+        training_batch_size (int): batch size for the training/eval
+        skip_training (bool): if True, skip the training and only evaluate the models
 
     Returns:
         None
@@ -147,6 +150,12 @@ def main(
         f"## {TColors.OKBLUE}{TColors.BOLD}Dataset Batch Size{TColors.ENDC}: {dataset_batch_size}"
     )
     print(
+        f"## {TColors.OKBLUE}{TColors.BOLD}Training Batch Size{TColors.ENDC}: {training_batch_size}"
+    )
+    print(
+        f"## {TColors.OKBLUE}{TColors.BOLD}Skip Training{TColors.ENDC}: {skip_training}"
+    )
+    print(
         f"## {TColors.OKBLUE}{TColors.BOLD}Model Saving Path{TColors.ENDC}: {MODEL_PATH}"
     )
     print(
@@ -154,213 +163,214 @@ def main(
     )
     print("#" * os.get_terminal_size().columns + "\n")
 
-    # ───────────────────────── start the actual finetuning ──────────────────────────────
-    # iterte over two loops: first the model training and then the dataset generation
-    # the model is trained for N times and after each training the dataset
-    # is generated from the new model
-
-    # load the dataset
-    original_dataset = load_dataset(
-        DATASET_SPECIFIER,
-        split="train"
-    )
-    original_dataset = original_dataset.select_columns(["instruction", "response"])
-    original_dataset.save_to_disk(DATASET_PATH + "original_dataset")
-    # the dataloader is later used for the generation of the new dataset
-    original_dataloader = DataLoader(
-        original_dataset.with_format("torch"),
-        batch_size=dataset_batch_size,
-    )
-    print(f"Original dataset length: {len(original_dataset)}")
-
-    for i in range(NUM_TRAINING):
-        # load the model
-        model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=MODEL_SPECIFIER if i == 0 else f"{MODEL_PATH}/model_{i-1}_fp16",
-            max_seq_length=MAX_SEQ_LENGTH,
-            dtype=None,
-            load_in_4bit=True,
-        )
-        global EOS_TOKEN
-        EOS_TOKEN = tokenizer.eos_token
-
-        # add LoRA adapters
-        model = FastLanguageModel.get_peft_model(
-            model,
-            r=16,  # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
-            target_modules=[
-                "q_proj",
-                "k_proj",
-                "v_proj",
-                "o_proj",
-                "gate_proj",
-                "up_proj",
-                "down_proj",
-            ],
-            lora_alpha=16,
-            lora_dropout=0,  # Supports any, but = 0 is optimized
-            bias="none",  # Supports any, but = "none" is optimized
-            use_gradient_checkpointing="unsloth",  # True or "unsloth" for very long context
-            random_state=1337,
-            use_rslora=False,  # We support rank stabilized LoRA
-            loftq_config=None,  # And LoftQ
-        )
+    if not skip_training:
+        # ───────────────────────── start the actual finetuning ──────────────────────────────
+        # iterte over two loops: first the model training and then the dataset generation
+        # the model is trained for N times and after each training the dataset
+        # is generated from the new model
 
         # load the dataset
-        if i > 0:
-            # if the first training iteration is done, load the generated dataset from the disk
-            dataset = Dataset.load_from_disk(DATASET_PATH+f"generated_dataset_{i-1}")
-        else:
-            dataset = original_dataset
-
-        # for the first model the original dataset is used, then the generated dataset
-        # is used for the next models
-        dataset_train, dataset_val = make_splits(dataset)
-        dataset_train = dataset_train.map(format_prompt, batched=True)
-        dataset_val = dataset_val.map(format_prompt, batched=True)
-
-        # for some stats
-        gpu_stats = torch.cuda.get_device_properties(0)
-        start_gpu_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
-        max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
-
-        # create a trainer to train the model
-        trainer = SFTTrainer(
-            model=model,
-            tokenizer=tokenizer,
-            train_dataset=dataset_train,
-            eval_dataset=dataset_val,
-            # formatting_func=format_prompt,
-            dataset_text_field="text",
-            max_seq_length=MAX_SEQ_LENGTH,
-            dataset_num_proc=8,
-            packing=True,  # Can make training 5x faster for short sequences.
-            args=TrainingArguments(
-                gradient_accumulation_steps=4,
-                warmup_steps=5,
-                num_train_epochs=training_epochs,
-                per_device_train_batch_size=training_batch_size,
-                per_device_eval_batch_size=training_batch_size,
-                learning_rate=2e-4,
-                fp16=not is_bfloat16_supported(),
-                bf16=is_bfloat16_supported(),
-                logging_steps=1,
-                optim="adamw_8bit",
-                weight_decay=0.01,
-                lr_scheduler_type="linear",
-                seed=1337,
-                output_dir="outputs",
-                report_to="none",
-            ),
+        original_dataset = load_dataset(
+            DATASET_SPECIFIER,
+            split="train"
         )
-
-        # train the model
-        trainer_stats = trainer.train()
-
-        # print some fancy stats
-        used_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
-        used_memory_for_lora = round(used_memory - start_gpu_memory, 3)
-        used_percentage = round(used_memory / max_memory * 100, 3)
-        lora_percentage = round(used_memory_for_lora / max_memory * 100, 3)
-        print(f"{trainer_stats.metrics["train_runtime"]} seconds used for training.")
-        print(
-            f"{round(trainer_stats.metrics["train_runtime"]/60, 2)} minutes used for training."
+        original_dataset = original_dataset.select_columns(["instruction", "response"])
+        original_dataset.save_to_disk(DATASET_PATH + "original_dataset")
+        # the dataloader is later used for the generation of the new dataset
+        original_dataloader = DataLoader(
+            original_dataset.with_format("torch"),
+            batch_size=dataset_batch_size,
         )
-        print(f"Peak reserved memory = {used_memory} GB.")
-        print(f"Peak reserved memory for training = {used_memory_for_lora} GB.")
-        print(f"Peak reserved memory % of max memory = {used_percentage} %.")
-        print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.")
+        print(f"Original dataset length: {len(original_dataset)}")
 
-        # save the model
-        trainer.model.save_pretrained(
-            f"{MODEL_PATH}/model_{i}_fp16",
-            safe_serialization=True,
-            save_adapter=True,
-            save_config=True,
-        )
-        trainer.tokenizer.save_pretrained(f"{MODEL_PATH}/model_{i}_fp16")
-
-        del trainer
-        del model
-        del tokenizer
-        torch.cuda.empty_cache()
-        torch.cuda.reset_peak_memory_stats()
-
-        # use the model to generate the new dataset
-        # for this the model is loaded again with the quantized weights
-        model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=f"{MODEL_PATH}/model_{i}_fp16",
-            max_seq_length=MAX_SEQ_LENGTH,
-            dtype=None,
-            load_in_4bit=True,
-        )
-        FastLanguageModel.for_inference(model)
-
-        # ────────────────────────────── generate the new datasets ────────────────────────────
-        print(f"## {TColors.OKBLUE}{TColors.BOLD}Generate Dataset{TColors.ENDC}")
-        new_data = []
-        for gen_iter, data_batch in tqdm(
-            enumerate(original_dataloader), total=len(original_dataloader)
-        ):
-            # generate a dataset with the same length as the original dataset
-            if gen_iter >= len(original_dataloader):
-                break
-
-            # tokenize the data batch
-            inputs = []
-            for data in data_batch["instruction"]:
-                inputs.append(
-                    f""""You are Qwen, created by Alibaba. You are a helpful assistant.
-
-                    ### Instruction:
-                    {data}"""
-                )
-            # generate the answer using the model
-            inputs = tokenizer(
-                inputs,
-                padding=True,
-                truncation=True,
-                return_tensors="pt",
-            ).to("cuda")
-
-            generated_answers = model.generate(
-                **inputs,
-                max_new_tokens=MAX_SEQ_LENGTH,
-                use_cache=True,
-                temperature=0.01,
-
+        for i in range(NUM_TRAINING):
+            # load the model
+            model, tokenizer = FastLanguageModel.from_pretrained(
+                model_name=MODEL_SPECIFIER if i == 0 else f"{MODEL_PATH}/model_{i-1}_fp16",
+                max_seq_length=MAX_SEQ_LENGTH,
+                dtype=None,
+                load_in_4bit=True,
             )
-            generated_answers = tokenizer.batch_decode(
-                generated_answers, skip_special_tokens=True
+            global EOS_TOKEN
+            EOS_TOKEN = tokenizer.eos_token
+
+            # add LoRA adapters
+            model = FastLanguageModel.get_peft_model(
+                model,
+                r=16,  # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
+                target_modules=[
+                    "q_proj",
+                    "k_proj",
+                    "v_proj",
+                    "o_proj",
+                    "gate_proj",
+                    "up_proj",
+                    "down_proj",
+                ],
+                lora_alpha=16,
+                lora_dropout=0,  # Supports any, but = 0 is optimized
+                bias="none",  # Supports any, but = "none" is optimized
+                use_gradient_checkpointing="unsloth",  # True or "unsloth" for very long context
+                random_state=1337,
+                use_rslora=False,  # We support rank stabilized LoRA
+                loftq_config=None,  # And LoftQ
             )
 
-            # add the generated answer to the dataset
-            for generated_answer, data in zip(
-                generated_answers, data_batch["instruction"]
+            # load the dataset
+            if i > 0:
+                # if the first training iteration is done, load the generated dataset from the disk
+                dataset = Dataset.load_from_disk(DATASET_PATH+f"generated_dataset_{i-1}")
+            else:
+                dataset = original_dataset
+
+            # for the first model the original dataset is used, then the generated dataset
+            # is used for the next models
+            dataset_train, dataset_val = make_splits(dataset)
+            dataset_train = dataset_train.map(format_prompt, batched=True)
+            dataset_val = dataset_val.map(format_prompt, batched=True)
+
+            # for some stats
+            gpu_stats = torch.cuda.get_device_properties(0)
+            start_gpu_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
+            max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
+
+            # create a trainer to train the model
+            trainer = SFTTrainer(
+                model=model,
+                tokenizer=tokenizer,
+                train_dataset=dataset_train,
+                eval_dataset=dataset_val,
+                # formatting_func=format_prompt,
+                dataset_text_field="text",
+                max_seq_length=MAX_SEQ_LENGTH,
+                dataset_num_proc=8,
+                packing=True,  # Can make training 5x faster for short sequences.
+                args=TrainingArguments(
+                    gradient_accumulation_steps=4,
+                    warmup_steps=5,
+                    num_train_epochs=training_epochs,
+                    per_device_train_batch_size=training_batch_size,
+                    per_device_eval_batch_size=training_batch_size,
+                    learning_rate=2e-4,
+                    fp16=not is_bfloat16_supported(),
+                    bf16=is_bfloat16_supported(),
+                    logging_steps=1,
+                    optim="adamw_8bit",
+                    weight_decay=0.01,
+                    lr_scheduler_type="linear",
+                    seed=1337,
+                    output_dir="outputs",
+                    report_to="none",
+                ),
+            )
+
+            # train the model
+            trainer_stats = trainer.train()
+
+            # print some fancy stats
+            used_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
+            used_memory_for_lora = round(used_memory - start_gpu_memory, 3)
+            used_percentage = round(used_memory / max_memory * 100, 3)
+            lora_percentage = round(used_memory_for_lora / max_memory * 100, 3)
+            print(f"{trainer_stats.metrics["train_runtime"]} seconds used for training.")
+            print(
+                f"{round(trainer_stats.metrics["train_runtime"]/60, 2)} minutes used for training."
+            )
+            print(f"Peak reserved memory = {used_memory} GB.")
+            print(f"Peak reserved memory for training = {used_memory_for_lora} GB.")
+            print(f"Peak reserved memory % of max memory = {used_percentage} %.")
+            print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.")
+
+            # save the model
+            trainer.model.save_pretrained(
+                f"{MODEL_PATH}/model_{i}_fp16",
+                safe_serialization=True,
+                save_adapter=True,
+                save_config=True,
+            )
+            trainer.tokenizer.save_pretrained(f"{MODEL_PATH}/model_{i}_fp16")
+
+            del trainer
+            del model
+            del tokenizer
+            torch.cuda.empty_cache()
+            torch.cuda.reset_peak_memory_stats()
+
+            # use the model to generate the new dataset
+            # for this the model is loaded again with the quantized weights
+            model, tokenizer = FastLanguageModel.from_pretrained(
+                model_name=f"{MODEL_PATH}/model_{i}_fp16",
+                max_seq_length=MAX_SEQ_LENGTH,
+                dtype=None,
+                load_in_4bit=True,
+            )
+            FastLanguageModel.for_inference(model)
+
+            # ────────────────────────────── generate the new datasets ────────────────────────────
+            print(f"## {TColors.OKBLUE}{TColors.BOLD}Generate Dataset{TColors.ENDC}")
+            new_data = []
+            for gen_iter, data_batch in tqdm(
+                enumerate(original_dataloader), total=len(original_dataloader)
             ):
-                question = f""""You are Qwen, created by Alibaba. You are a helpful assistant.
+                # generate a dataset with the same length as the original dataset
+                if gen_iter >= len(original_dataloader):
+                    break
 
-                    ### Instruction:
-                    {data}"""
+                # tokenize the data batch
+                inputs = []
+                for data in data_batch["instruction"]:
+                    inputs.append(
+                        f""""You are Qwen, created by Alibaba. You are a helpful assistant.
 
-                # remove the prompt from the generated answer
-                generated_answer = generated_answer.replace(question, "").strip()
-                # add the generated answer to the dataset
-                if len(generated_answer) == 0:
-                    continue
-                if len(question) == 0:
-                    continue
+                        ### Instruction:
+                        {data}"""
+                    )
+                # generate the answer using the model
+                inputs = tokenizer(
+                    inputs,
+                    padding=True,
+                    truncation=True,
+                    return_tensors="pt",
+                ).to("cuda")
 
-                # add the generated answer to the dataset
-                new_data.append(
-                    {
-                        "instruction": question,
-                        "response": generated_answer,
-                    }
+                generated_answers = model.generate(
+                    **inputs,
+                    max_new_tokens=MAX_SEQ_LENGTH,
+                    use_cache=True,
+                    temperature=0.01,
+
                 )
-        # save the new dataset to disk
-        new_dataset = Dataset.from_list(new_data)
-        new_dataset.save_to_disk(DATASET_PATH + f"generated_dataset_{i}")
+                generated_answers = tokenizer.batch_decode(
+                    generated_answers, skip_special_tokens=True
+                )
+
+                # add the generated answer to the dataset
+                for generated_answer, data in zip(
+                    generated_answers, data_batch["instruction"]
+                ):
+                    question = f""""You are Qwen, created by Alibaba. You are a helpful assistant.
+
+                        ### Instruction:
+                        {data}"""
+
+                    # remove the prompt from the generated answer
+                    generated_answer = generated_answer.replace(question, "").strip()
+                    # add the generated answer to the dataset
+                    if len(generated_answer) == 0:
+                        continue
+                    if len(question) == 0:
+                        continue
+
+                    # add the generated answer to the dataset
+                    new_data.append(
+                        {
+                            "instruction": question,
+                            "response": generated_answer,
+                        }
+                    )
+            # save the new dataset to disk
+            new_dataset = Dataset.from_list(new_data)
+            new_dataset.save_to_disk(DATASET_PATH + f"generated_dataset_{i}")
 
     # ────────────────── evaluate the models' perplexity and other metrics ─────────────────────────
     # iterate over every model and the generated dataset and calculate the perplexity
@@ -456,6 +466,12 @@ if __name__ == "__main__":
         type=int,
         default=8,
         help="specifies the batch size for the training/eval",
+    )
+    parser.add_argument(
+        "--skip_training",
+        "-st",
+        action="store_true",
+        help="if set, skip the training and only evaluate the models",
     )
     args = parser.parse_args()
     main(**vars(args))
