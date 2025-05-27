@@ -308,11 +308,11 @@ def main(
             FastLanguageModel.for_inference(model)
 
             # ────────────────────────────── generate the new datasets ────────────────────────────
-            print(f"## {TColors.OKBLUE}{TColors.BOLD}Generate Dataset{TColors.ENDC}")
             new_data = []
             for gen_iter, data_batch in tqdm(
                 enumerate(original_dataloader), total=len(original_dataloader)
             ):
+                print(f"## {TColors.OKBLUE}{TColors.BOLD}Generate Dataset {gen_iter}{TColors.ENDC}")
                 # generate a dataset with the same length as the original dataset
                 if gen_iter >= len(original_dataloader):
                     break
