@@ -21,7 +21,7 @@ from utils.colors import TColors
 
 MODEL_SPECIFIER: str = "unsloth/Qwen2.5-Coder-0.5B-Instruct"
 DATASET_SPECIFIER: str = "bigcode/self-oss-instruct-sc2-exec-filter-50k"
-MAX_SEQ_LENGTH: int = 2048
+MAX_SEQ_LENGTH: int = 8192
 MODEL_PATH: str = "./model_outputs/"
 DATASET_PATH: str = "./generated_datasets/"
 EOS_TOKEN: str = None # will be overwritten by the tokenizer
