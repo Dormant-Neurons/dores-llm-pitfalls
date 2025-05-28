@@ -1,10 +1,12 @@
 # project specific
+datasets/
 outputs/
 generated_datasets/
 unsloth_compiled_cache/
 _unsloth_sentencepiece_temp/
 llama.cpp/
 model_outputs/
+.DS_Store
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
