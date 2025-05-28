@@ -20,7 +20,7 @@ DATA_DIR = Path("./datasets/primevul")
 SPLITS   = ["primevul_train.jsonl", "primevul_test.jsonl", "primevul_valid.jsonl"]
 OUT_FILE = DATA_DIR / "commit_dates.jsonl"
 
-# ───────────────────────── helper functions ──────────────────────────
+# ───────────────────── helper functions ──────────────────────
 
 def load_commits() -> dict[str, set[str]]:
     """Return {project_url: {sha, …}, …}."""
@@ -29,19 +29,12 @@ def load_commits() -> dict[str, set[str]]:
         with open(DATA_DIR / split) as fh:
             for line in fh:
                 rec = json.loads(line)
-                projects[rec["project_url"]].add(rec["commit_id"])
+                projects[rec["project_url"].strip()].add(rec["commit_id"].strip())
     return projects
-
 
 def normalise(url: str) -> str | None:
     """
     Convert a project URL from the dataset into something `git clone` understands.
-
-    Currently:
-      • GitHub/GitLab/etc: append '.git' if missing
-      • Savannah GitWeb:   https://git.savannah.gnu.org/gitweb/?p=gnutls
-                           → https://git.savannah.gnu.org/git/gnutls.git
-    Return None if we cannot guess.
     """
     if "gitweb" in url and "?p=" in url:
         parsed = up.urlparse(url)
@@ -52,9 +45,7 @@ def normalise(url: str) -> str | None:
     if url.startswith(("https://github.com/", "https://gitlab.com/")) and not url.endswith(".git"):
         return url + ".git"
 
-    # already looks cloneable – hope for the best
     return url
-
 
 def commit_date(repo: Path, sha: str) -> str:
     """Return ISO-8601 date for a commit inside `repo`."""
@@ -63,18 +54,36 @@ def commit_date(repo: Path, sha: str) -> str:
         text=True,
     ).strip()
 
+def load_existing_commits(filepath: Path) -> set[tuple[str, str]]:
+    """Load existing (project, commit_id) pairs from output file."""
+    existing = set()
+    if filepath.exists():
+        with open(filepath) as fh:
+            for line in fh:
+                try:
+                    rec = json.loads(line)
+                    existing.add((rec["project"], rec["commit_id"]))
+                except json.JSONDecodeError:
+                    continue
+    return existing
 
-# ────────────────────────────── main ─────────────────────────────────
+# ───────────────────── main ──────────────────────
 
 def main() -> None:
     projects = load_commits()
-    skipped_projects, skipped_commits = 0, 0
+    processed = load_existing_commits(OUT_FILE)
+    skipped_projects, skipped_commits, already_done = 0, 0, 0
 
-    with open(OUT_FILE, "w") as out, tempfile.TemporaryDirectory() as tmpdir:
+    with open(OUT_FILE, "a") as out, tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
-        repo_path = tmpdir / "repo"   # will be wiped after each project
+        repo_path = tmpdir / "repo"
 
         for proj_url, shas in projects.items():
+            if any((proj_url, sha) in processed for sha in shas):
+                print(f"Skipping already partially processed project: {proj_url}")
+                skipped_projects += 1
+                continue
+
             clone_url = normalise(proj_url)
             print(f"Cloning {clone_url} …")
 
@@ -91,15 +100,15 @@ def main() -> None:
                     out.write(json.dumps({"project": proj_url,
                                           "commit_id": sha,
                                           "commit_date": date}) + "\n")
+                    out.flush()
+                    processed.add((proj_url, sha))
                 except subprocess.CalledProcessError:
-                    skipped_commits += 1   # SHA missing
-            # clean up for the next repo
+                    skipped_commits += 1
             shutil.rmtree(repo_path)
 
     print(f"\nDone. Results saved to {OUT_FILE}")
     if skipped_projects or skipped_commits:
         print(f"Skipped {skipped_projects} projects and {skipped_commits} commits.")
-
 
 if __name__ == "__main__":
     main()
