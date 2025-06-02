@@ -3,6 +3,8 @@
 # !/usr/bin/env python3
 
 import os
+import time
+from datetime import timedelta
 import psutil
 import getpass
 import datetime
@@ -85,6 +87,7 @@ def main(
     Returns:
         None
     """
+    start_time = time.time()
 
     # ──────────────────────────── set devices and print informations ─────────────────────────
     # set the devices correctly
@@ -444,6 +447,28 @@ def main(
 
     print(f"## {TColors.OKBLUE}{TColors.BOLD}Saved the histogram under: " \
           f"{TColors.HEADER}./perplexity_histogram.png{TColors.ENDC}")
+
+
+    # ────────────────── print the elapsed time ─────────────────────────
+    # End the timer
+    end_time = time.time()
+
+    # Calculate elapsed time
+    elapsed_time = end_time - start_time
+    delta = timedelta(seconds=int(elapsed_time))
+
+    days = delta.days
+    hours, remainder = divmod(delta.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    print(f"## {TColors.OKBLUE}{TColors.BOLD} Execution time: ")
+    if days:
+        print(f"{TColors.HEADER}{days} days, {hours:02}:{minutes:02}:{seconds:02}")
+    else:
+        print(f"{TColors.HEADER}{hours:02}:{minutes:02}:{seconds:02}")
+    print(f"{TColors.ENDC}")
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="pitfall_1")
