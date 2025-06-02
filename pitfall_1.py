@@ -336,6 +336,8 @@ def main(
 
                 generated_answers = model.generate(
                     **inputs,
+                    num_beams=5,
+                    repeat_penalty=3.0,
                     max_new_tokens=MAX_SEQ_LENGTH,
                     use_cache=True,
                     temperature=0.01,
