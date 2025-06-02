@@ -190,7 +190,7 @@ def main(
         for i in range(num_generations):
             # load the model
             model, tokenizer = FastLanguageModel.from_pretrained(
-                model_name=MODEL_SPECIFIER if i == 0 else f"{MODEL_PATH}/model_{i-1}_fp16",
+                model_name=MODEL_SPECIFIER,# if i == 0 else f"{MODEL_PATH}/model_{i-1}_fp16",
                 max_seq_length=MAX_SEQ_LENGTH,
                 dtype=None,
                 load_in_4bit=True,
