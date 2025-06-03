@@ -21,7 +21,7 @@ from datasets import load_dataset, Dataset
 
 from utils.colors import TColors
 
-MODEL_SPECIFIER: str = "unsloth/Qwen2.5-Coder-0.5B-Instruct"
+MODEL_SPECIFIER: str = "unsloth/Qwen2.5-Coder-0.5B"
 DATASET_SPECIFIER: str = "bigcode/self-oss-instruct-sc2-exec-filter-50k"
 MAX_SEQ_LENGTH: int = 8192
 MODEL_PATH: str = "./model_outputs/"
@@ -186,6 +186,31 @@ def main(
             batch_size=dataset_batch_size,
         )
         print(f"Original dataset length: {len(original_dataset)}")
+
+        # also calculate the maximum and average token count of the dataset entries
+        _, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=MODEL_SPECIFIER,# if i == 0 else f"{MODEL_PATH}/model_{i-1}_fp16",
+            max_seq_length=MAX_SEQ_LENGTH,
+            dtype=None,
+            load_in_4bit=True,
+        )
+        token_counts = []
+        for data in tqdm(original_dataset, desc="Calculating token counts"):
+            # tokenize the data
+            inputs = tokenizer(
+                data["instruction"],
+                padding=True,
+                truncation=True,
+                return_tensors="pt",
+            )
+            # count the tokens
+            token_count = inputs["input_ids"].shape[1]
+            token_counts.append(token_count)
+        max_token_count = max(token_counts)
+        avg_token_count = sum(token_counts) / len(token_counts)
+        print(f"Max token count: {max_token_count}")
+        print(f"Avg token count: {avg_token_count}")
+        print()
 
         for i in range(num_generations):
             # load the model
