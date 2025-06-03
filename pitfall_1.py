@@ -201,7 +201,7 @@ def main(
         for data in tqdm(token_dataset, desc="Calculating token counts"):
             # tokenize the data
             inputs = tokenizer(
-                data["instruction"],
+                data["response"],
                 padding=True,
                 truncation=True,
                 return_tensors="pt",
