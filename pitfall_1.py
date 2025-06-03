@@ -51,13 +51,13 @@ def preprocess_dataset(dataset: Dataset, block_size: int, tokenizer) -> Dataset:
         total_length = (total_length // block_size) * block_size
 
     # split the data into chunks of block_size
-    chunked_data = [
-        concatenated_data[i : i + block_size]
-        for i in range(0, total_length, block_size)
-    ]
-    # remove the last chunk if it is smaller than block_size
-    if len(chunked_data[-1]) < block_size:
-        chunked_data = chunked_data[:-1]
+    chunked_data = []
+    for entry in concatenated_data:
+        for i in range(0, len(entry), block_size):
+            if entry[i : i + block_size] < block_size:
+                # if the last chunk is smaller than block_size, we skip it
+                continue
+            chunked_data.append(entry[i : i + block_size])
 
     # now the list contains tokenized chunks of the dataset, each of size block_size
     # we decode it not back into text
