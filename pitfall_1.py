@@ -229,15 +229,16 @@ def main(
         original_dataset = original_dataset.select_columns(["response"])
         original_dataset = original_dataset.map(format_prompt, batched=True)
         original_dataset.save_to_disk(DATASET_PATH + "original_dataset")
-        # the dataloader is later used for the generation of the new dataset
-        original_dataloader = DataLoader(
-            original_dataset.with_format("torch"),
-            batch_size=dataset_batch_size,
-        )
+
         print(f"Original dataset length: {len(original_dataset)}")
 
         # preprocess the dataset
         chunked_dataset = preprocess_dataset(original_dataset, block_size, tokenizer)
+        # the dataloader is later used for the generation of the new dataset
+        chunked_dataloader = DataLoader(
+            chunked_dataset.with_format("torch"),
+            batch_size=dataset_batch_size,
+        )
 
         for i in range(num_generations):
             # load the model
@@ -378,14 +379,16 @@ def main(
             # ────────────────────────────── generate the new datasets ────────────────────────────
             new_data = []
             for _, data_batch in tqdm(
-                enumerate(original_dataloader), total=len(original_dataloader)
+                enumerate(chunked_dataloader), total=len(chunked_dataloader)
             ):
                 # tokenize the data batch
-                inputs = list(data_batch["response"])
+                inputs = list(data_batch["text"])
 
                 # generate the answer using the model
                 inputs = tokenizer(
                     inputs,
+                    padding=True,
+                    truncation=True,
                     return_tensors="pt",
                 ).to("cuda")
 
