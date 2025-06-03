@@ -373,7 +373,7 @@ def main(
 
                 generated_answers = model.generate(
                     **inputs,
-                    num_beams=5,
+                    #num_beams=5,
                     repetition_penalty=3.0,
                     min_new_tokens=min_token_count,
                     max_new_tokens=MAX_SEQ_LENGTH,
