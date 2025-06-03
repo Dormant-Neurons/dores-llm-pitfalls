@@ -35,7 +35,7 @@ def preprocess_dataset(dataset: Dataset, block_size: int, tokenizer) -> Dataset:
     def tokenize_func(examples: dict) -> dict:
         """Tokenize the dataset examples"""
         # tokenize the data
-        return tokenizer(examples["response"])
+        return tokenizer(examples["response"])["input_ids"]
 
     dataset = dataset.select_columns(["response"])
     dataset = dataset.map(tokenize_func, batched=True, num_proc=8, keep_in_memory=True)
