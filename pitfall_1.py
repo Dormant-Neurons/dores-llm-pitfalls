@@ -54,7 +54,7 @@ def preprocess_dataset(dataset: Dataset, block_size: int, tokenizer) -> Dataset:
     chunked_data = []
     for entry in concatenated_data:
         for i in range(0, len(entry), block_size):
-            if entry[i : i + block_size] < block_size:
+            if len(entry[i : i + block_size]) < block_size:
                 # if the last chunk is smaller than block_size, we skip it
                 continue
             chunked_data.append(entry[i : i + block_size])
