@@ -191,6 +191,9 @@ def main(
             dtype=None,
             load_in_4bit=True,
         )
+        global EOS_TOKEN
+        EOS_TOKEN = tokenizer.eos_token
+
         token_counts = []
         for data in tqdm(token_dataset, desc="Calculating token counts"):
             # tokenize the data
