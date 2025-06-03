@@ -39,7 +39,7 @@ def format_prompt(examples: dict) -> dict:
 
     for user_input, response in zip(user_inputs, responses):
         prompts.append(
-            f""""<|imstart|>system
+            f"""<|imstart|>system
             You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
             <|im_start|>user
             {user_input}<|im_end|>
@@ -53,10 +53,6 @@ def format_prompt(examples: dict) -> dict:
 
 def make_splits(dataset: Dataset) -> Dataset:
     """Splits the dataset into training and validation sets"""
-
-    # shuffle the dataset
-    dataset = dataset.shuffle(seed=42)
-
     # split the dataset into training and validation sets
     train_size = int(0.8 * len(dataset))
     train_dataset = dataset.select(range(train_size))
