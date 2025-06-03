@@ -213,6 +213,7 @@ def main(
         min_token_count = min(token_counts)
         max_token_count = max(token_counts)
         avg_token_count = sum(token_counts) / len(token_counts)
+        print(f"Min token count: {min_token_count}")
         print(f"Max token count: {max_token_count}")
         print(f"Avg token count: {avg_token_count}")
         print()
