@@ -23,7 +23,7 @@ from utils.colors import TColors
 
 MODEL_SPECIFIER: str = "unsloth/Qwen2.5-Coder-0.5B"
 DATASET_SPECIFIER: str = "bigcode/self-oss-instruct-sc2-exec-filter-50k"
-MAX_SEQ_LENGTH: int = 4096
+MAX_SEQ_LENGTH: int = 2048
 MODEL_PATH: str = "./model_outputs/"
 DATASET_PATH: str = "./generated_datasets/"
 EOS_TOKEN: str = None  # will be overwritten by the tokenizer
@@ -32,21 +32,25 @@ EOS_TOKEN: str = None  # will be overwritten by the tokenizer
 def format_prompt(examples: dict) -> dict:
     """format the dataset inputs for the trainer"""
 
-    user_inputs = examples["instruction"]
-    responses = examples["response"]
+    completion_data = examples["response"] # we only want the code completion part
+    # user_inputs = examples["instruction"]
+    # responses = examples["response"]
 
     prompts = []
 
-    for user_input, response in zip(user_inputs, responses):
-        prompts.append(
-            f"""<|imstart|>system
-            You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
-            <|im_start|>user
-            {user_input}<|im_end|>
-            <|im_start|>assistant
-            {response}<|im_end|>"""
-            + EOS_TOKEN
-        )
+    # for user_input, response in zip(user_inputs, responses):
+    #     prompts.append(
+    #         f"""<|imstart|>system
+    #         You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
+    #         <|im_start|>user
+    #         {user_input}<|im_end|>
+    #         <|im_start|>assistant
+    #         {response}<|im_end|>"""
+    #         + EOS_TOKEN
+    #     )
+
+    for data in completion_data:
+        prompts.append(data + EOS_TOKEN)
 
     return {"text": prompts}
 
@@ -181,7 +185,7 @@ def main(
 
         # load the dataset
         original_dataset = load_dataset(DATASET_SPECIFIER, split="train")
-        original_dataset = original_dataset.select_columns(["instruction", "response"])
+        original_dataset = original_dataset.select_columns(["response"])
         original_dataset.save_to_disk(DATASET_PATH + "original_dataset")
         # the dataloader is later used for the generation of the new dataset
         original_dataloader = DataLoader(
@@ -205,6 +209,8 @@ def main(
             # count the tokens
             token_count = inputs["input_ids"].shape[1]
             token_counts.append(token_count)
+
+        min_token_count = min(token_counts)
         max_token_count = max(token_counts)
         avg_token_count = sum(token_counts) / len(token_counts)
         print(f"Max token count: {max_token_count}")
@@ -351,18 +357,12 @@ def main(
 
             # ────────────────────────────── generate the new datasets ────────────────────────────
             new_data = []
-            for gen_iter, data_batch in tqdm(
+            for _, data_batch in tqdm(
                 enumerate(original_dataloader), total=len(original_dataloader)
             ):
                 # tokenize the data batch
-                inputs = []
-                for data in data_batch["instruction"]:
-                    inputs.append(
-                        f""""You are Qwen, created by Alibaba. You are a helpful assistant.
+                inputs = list(data_batch["response"])
 
-                        ### Instruction:
-                        {data}"""
-                    )
                 # generate the answer using the model
                 inputs = tokenizer(
                     inputs,
@@ -375,38 +375,19 @@ def main(
                     **inputs,
                     num_beams=5,
                     repeat_penalty=3.0,
+                    min_new_tokens=min_token_count,
                     max_new_tokens=MAX_SEQ_LENGTH,
                     use_cache=True,
-                    temperature=0.01,
                 )
+
+                # only keep and decode the first 64 tokens of the generated answer
+                generated_answers = generated_answers[:, :64]
                 generated_answers = tokenizer.batch_decode(
                     generated_answers, skip_special_tokens=True
                 )
 
-                # add the generated answer to the dataset
-                for generated_answer, data in zip(
-                    generated_answers, data_batch["instruction"]
-                ):
-                    question = f""""You are Qwen, created by Alibaba. You are a helpful assistant.
+                new_data.append({"response": answer for answer in generated_answers})
 
-                        ### Instruction:
-                        {data}"""
-
-                    # remove the prompt from the generated answer
-                    generated_answer = generated_answer.replace(question, "").strip()
-                    # add the generated answer to the dataset
-                    if len(generated_answer) == 0:
-                        continue
-                    if len(question) == 0:
-                        continue
-
-                    # add the generated answer to the dataset
-                    new_data.append(
-                        {
-                            "instruction": question,
-                            "response": generated_answer,
-                        }
-                    )
             # save the new dataset to disk
             new_dataset = Dataset.from_list(new_data)
             new_dataset.save_to_disk(DATASET_PATH + f"generated_dataset_{i}")
