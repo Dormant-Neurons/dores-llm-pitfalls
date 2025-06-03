@@ -39,13 +39,13 @@ def format_prompt(examples: dict) -> dict:
 
     for user_input, response in zip(user_inputs, responses):
         prompts.append(
-            f""""You are Qwen, created by Alibaba. You are a helpful assistant.
-
-            ### Instruction:
-            {user_input}
-
-            ### Response:
-            {response}""" + EOS_TOKEN
+            f""""<|imstart|>system
+            You are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>
+            <|im_start|>user
+            {user_input}<|im_end|>
+            <|im_start|>assistant
+            {response}<|im_end|>"""
+            + EOS_TOKEN
         )
 
     return {"text": prompts}
@@ -188,6 +188,7 @@ def main(
         print(f"Original dataset length: {len(original_dataset)}")
 
         # also calculate the maximum and average token count of the dataset entries
+        token_dataset = original_dataset.map(format_prompt, batched=True)
         _, tokenizer = FastLanguageModel.from_pretrained(
             model_name=MODEL_SPECIFIER,# if i == 0 else f"{MODEL_PATH}/model_{i-1}_fp16",
             max_seq_length=MAX_SEQ_LENGTH,
@@ -195,7 +196,7 @@ def main(
             load_in_4bit=True,
         )
         token_counts = []
-        for data in tqdm(original_dataset, desc="Calculating token counts"):
+        for data in tqdm(token_dataset, desc="Calculating token counts"):
             # tokenize the data
             inputs = tokenizer(
                 data["instruction"],
