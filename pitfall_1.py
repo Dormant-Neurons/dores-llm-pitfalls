@@ -220,8 +220,6 @@ def main(
                 dtype=None,
                 load_in_4bit=True,
             )
-            global EOS_TOKEN
-            EOS_TOKEN = tokenizer.eos_token
 
             # add LoRA adapters
             model = FastLanguageModel.get_peft_model(
