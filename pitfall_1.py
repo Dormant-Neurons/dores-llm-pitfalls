@@ -23,7 +23,7 @@ from utils.colors import TColors
 
 MODEL_SPECIFIER: str = "unsloth/Qwen2.5-Coder-0.5B"
 DATASET_SPECIFIER: str = "bigcode/self-oss-instruct-sc2-exec-filter-50k"
-MAX_SEQ_LENGTH: int = 8192
+MAX_SEQ_LENGTH: int = 4096
 MODEL_PATH: str = "./model_outputs/"
 DATASET_PATH: str = "./generated_datasets/"
 EOS_TOKEN: str = None # will be overwritten by the tokenizer
@@ -54,7 +54,7 @@ def format_prompt(examples: dict) -> dict:
 def make_splits(dataset: Dataset) -> Dataset:
     """Splits the dataset into training and validation sets"""
     # split the dataset into training and validation sets
-    train_size = int(0.8 * len(dataset))
+    train_size = int(0.9 * len(dataset))
     train_dataset = dataset.select(range(train_size))
     val_dataset = dataset.select(range(train_size, len(dataset)))
 
@@ -292,6 +292,8 @@ def main(
 
             # train the model
             trainer_stats = trainer.train()
+            metrics = trainer.evaluate()
+            print(f"## {TColors.OKBLUE}{TColors.BOLD}Metrics: {TColors.ENDC}{metrics["eval_loss"]:.4f} loss")
 
             # print some fancy stats
             used_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
@@ -338,10 +340,6 @@ def main(
             for gen_iter, data_batch in tqdm(
                 enumerate(original_dataloader), total=len(original_dataloader)
             ):
-                # generate a dataset with the same length as the original dataset
-                if gen_iter >= len(original_dataloader):
-                    break
-
                 # tokenize the data batch
                 inputs = []
                 for data in data_batch["instruction"]:
