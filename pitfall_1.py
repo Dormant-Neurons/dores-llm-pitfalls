@@ -169,11 +169,18 @@ def main(
         # the model is trained for N times and after each training the dataset
         # is generated from the new model
 
-        # load the dataset
-        original_dataset = load_dataset(
-            DATASET_SPECIFIER,
-            split="train"
+        # load the tokenizer to count to tokens of the dataset
+        _, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=MODEL_SPECIFIER,
+            max_seq_length=MAX_SEQ_LENGTH,
+            dtype=None,
+            load_in_4bit=True,
         )
+        global EOS_TOKEN
+        EOS_TOKEN = tokenizer.eos_token
+
+        # load the dataset
+        original_dataset = load_dataset(DATASET_SPECIFIER, split="train")
         original_dataset = original_dataset.select_columns(["instruction", "response"])
         original_dataset.save_to_disk(DATASET_PATH + "original_dataset")
         # the dataloader is later used for the generation of the new dataset
@@ -185,14 +192,6 @@ def main(
 
         # also calculate the maximum and average token count of the dataset entries
         token_dataset = original_dataset.map(format_prompt, batched=True)
-        _, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=MODEL_SPECIFIER,# if i == 0 else f"{MODEL_PATH}/model_{i-1}_fp16",
-            max_seq_length=MAX_SEQ_LENGTH,
-            dtype=None,
-            load_in_4bit=True,
-        )
-        global EOS_TOKEN
-        EOS_TOKEN = tokenizer.eos_token
 
         token_counts = []
         for data in tqdm(token_dataset, desc="Calculating token counts"):
