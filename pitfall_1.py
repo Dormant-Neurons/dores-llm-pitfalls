@@ -23,11 +23,50 @@ from utils.colors import TColors
 
 MODEL_SPECIFIER: str = "unsloth/Qwen2.5-Coder-0.5B"
 DATASET_SPECIFIER: str = "bigcode/self-oss-instruct-sc2-exec-filter-50k"
-MAX_SEQ_LENGTH: int = 2048
 MODEL_PATH: str = "./model_outputs/"
 DATASET_PATH: str = "./generated_datasets/"
 EOS_TOKEN: str = None  # will be overwritten by the tokenizer
 
+def preprocess_dataset(dataset: Dataset, block_size: int, tokenizer) -> Dataset:
+    """Preprocess the dataset: drop out unnecessary columns and batch the dataset in 
+    a predetermined block_size
+    """
+
+    def tokenize_func(examples: dict) -> dict:
+        """Tokenize the dataset examples"""
+        # tokenize the data
+        return tokenizer(examples["response"])
+
+    dataset = dataset.select_columns(["response"])
+    dataset.map(tokenize_func, batched=True, num_proc=8, keep_in_memory=True)
+
+    # concatenate all data into a list
+    concatenated_data = []
+    for data in dataset:
+        concatenated_data.append(data["response"])
+
+    total_length = len(concatenated_data)
+
+    if total_length >= block_size:
+        total_length = (total_length // block_size) * block_size
+
+    # split the data into chunks of block_size
+    chunked_data = [
+        concatenated_data[i : i + block_size]
+        for i in range(0, total_length, block_size)
+    ]
+    # remove the last chunk if it is smaller than block_size
+    if len(chunked_data[-1]) < block_size:
+        chunked_data = chunked_data[:-1]
+
+    # now the list contains tokenized chunks of the dataset, each of size block_size
+    # we decode it not back into text
+    chunked_data = [
+        tokenizer.decode(chunk) for chunk in chunked_data
+    ]
+
+    # convert the chunked data into a Dataset
+    return Dataset.from_dict({"text": chunked_data})
 
 def format_prompt(examples: dict) -> dict:
     """format the dataset inputs for the trainer"""
@@ -72,6 +111,7 @@ def main(
     training_batch_size: int = 8,
     skip_training: bool = False,
     num_generations: int = 5,
+    block_size: int = 64,
 ) -> None:
     """
     Main function to start the pitfall 1 fine-tuning
@@ -83,6 +123,7 @@ def main(
         training_batch_size (int): batch size for the training/eval
         skip_training (bool): if True, skip the training and only evaluate the models
         num_generations (int): number of generations to run (default: 5)
+        block_size (int): size of the blocks to split the dataset into (default: 64)
 
     Returns:
         None
@@ -145,7 +186,7 @@ def main(
         f"## {TColors.OKBLUE}{TColors.BOLD}Number of Generations{TColors.ENDC}: {num_generations}"
     )
     print(
-        f"## {TColors.OKBLUE}{TColors.BOLD}MAX_SEQ_LENGTH{TColors.ENDC}: {MAX_SEQ_LENGTH}"
+        f"## {TColors.OKBLUE}{TColors.BOLD}Block size{TColors.ENDC}: {block_size}"
     )
     print(
         f"## {TColors.OKBLUE}{TColors.BOLD}Training Steps{TColors.ENDC}: {training_epochs}"
@@ -176,7 +217,7 @@ def main(
         # load the tokenizer to count to tokens of the dataset
         _, tokenizer = FastLanguageModel.from_pretrained(
             model_name=MODEL_SPECIFIER,
-            max_seq_length=MAX_SEQ_LENGTH,
+            max_seq_length=block_size,
             dtype=None,
             load_in_4bit=True,
         )
@@ -186,6 +227,7 @@ def main(
         # load the dataset
         original_dataset = load_dataset(DATASET_SPECIFIER, split="train")
         original_dataset = original_dataset.select_columns(["response"])
+        original_dataset = original_dataset.map(format_prompt, batched=True)
         original_dataset.save_to_disk(DATASET_PATH + "original_dataset")
         # the dataloader is later used for the generation of the new dataset
         original_dataloader = DataLoader(
@@ -194,35 +236,14 @@ def main(
         )
         print(f"Original dataset length: {len(original_dataset)}")
 
-        # also calculate the maximum and average token count of the dataset entries
-        token_dataset = original_dataset.map(format_prompt, batched=True)
-
-        token_counts = []
-        for data in tqdm(token_dataset, desc="Calculating token counts"):
-            # tokenize the data
-            inputs = tokenizer(
-                data["response"],
-                padding=True,
-                truncation=True,
-                return_tensors="pt",
-            )
-            # count the tokens
-            token_count = inputs["input_ids"].shape[1]
-            token_counts.append(token_count)
-
-        min_token_count = min(token_counts)
-        max_token_count = max(token_counts)
-        avg_token_count = sum(token_counts) / len(token_counts)
-        print(f"Min token count: {min_token_count}")
-        print(f"Max token count: {max_token_count}")
-        print(f"Avg token count: {avg_token_count}")
-        print()
+        # preprocess the dataset
+        chunked_dataset = preprocess_dataset(original_dataset, block_size, tokenizer)
 
         for i in range(num_generations):
             # load the model
             model, tokenizer = FastLanguageModel.from_pretrained(
                 model_name=MODEL_SPECIFIER,  # if i == 0 else f"{MODEL_PATH}/model_{i-1}_fp16",
-                max_seq_length=MAX_SEQ_LENGTH,
+                max_seq_length=block_size,
                 dtype=None,
                 load_in_4bit=True,
             )
@@ -256,13 +277,11 @@ def main(
                     DATASET_PATH + f"generated_dataset_{i - 1}"
                 )
             else:
-                dataset = original_dataset
+                dataset = chunked_dataset
 
             # for the first model the original dataset is used, then the generated dataset
             # is used for the next models
             dataset_train, dataset_val = make_splits(dataset)
-            dataset_train = dataset_train.map(format_prompt, batched=True)
-            dataset_val = dataset_val.map(format_prompt, batched=True)
 
             # for some stats
             gpu_stats = torch.cuda.get_device_properties(0)
@@ -279,7 +298,7 @@ def main(
                 eval_dataset=dataset_val,
                 # formatting_func=format_prompt,
                 dataset_text_field="text",
-                max_seq_length=MAX_SEQ_LENGTH,
+                max_seq_length=block_size,
                 dataset_num_proc=8,
                 packing=True,  # Can make training 5x faster for short sequences.
                 args=TrainingArguments(
@@ -347,7 +366,7 @@ def main(
             # for this the model is loaded again with the quantized weights
             model, tokenizer = FastLanguageModel.from_pretrained(
                 model_name=f"{MODEL_PATH}/model_{i}_fp16",
-                max_seq_length=MAX_SEQ_LENGTH,
+                max_seq_length=block_size,
                 dtype=None,
                 load_in_4bit=True,
             )
@@ -367,8 +386,6 @@ def main(
                 # generate the answer using the model
                 inputs = tokenizer(
                     inputs,
-                    padding=True,
-                    truncation=True,
                     return_tensors="pt",
                 ).to("cuda")
 
@@ -376,21 +393,19 @@ def main(
                     **inputs,
                     #num_beams=5,
                     repetition_penalty=3.0,
-                    min_new_tokens=min_token_count,
-                    max_new_tokens=MAX_SEQ_LENGTH,
+                    min_new_tokens=block_size,
+                    max_new_tokens=block_size,
                     use_cache=True,
                 )
 
-                # only keep and decode the first 64 tokens of the generated answer
-                generated_answers = generated_answers[:, :64]
-                generated_answers = tokenizer.batch_decode(
-                    generated_answers, skip_special_tokens=True
-                )
+                # only keep and decode the last 64 tokens of the generated answer
+                generated_answers = generated_answers[:, 64:]
+                generated_answers = tokenizer.batch_decode(generated_answers)
 
-                new_data.append({"response": answer for answer in generated_answers})
+                new_data += list(generated_answers)
 
             # save the new dataset to disk
-            new_dataset = Dataset.from_list(new_data)
+            new_dataset = Dataset.from_dict({"text": new_data})
             new_dataset.save_to_disk(DATASET_PATH + f"generated_dataset_{i}")
 
     # ────────────────── evaluate the models' perplexity and other metrics ─────────────────────────
@@ -401,35 +416,32 @@ def main(
     perplexity_dict = {}
     all_perplexities = []
 
-    # load the original dataset but use only the non-train questions
-    # load the dataset
-    ppl_dataset = load_dataset(DATASET_SPECIFIER, split="train")
-    ppl_dataset = ppl_dataset.select_columns(["instruction", "response"])
-    _, ppl_dataset_val = make_splits(ppl_dataset)
-
-    ppl_dataloader = DataLoader(
-        ppl_dataset_val.with_format("torch"),
-        batch_size=1,
+    model, tokenizer = FastLanguageModel.from_pretrained(
+        model_name=MODEL_SPECIFIER,
+        max_seq_length=block_size,
+        dtype=None,
+        load_in_4bit=True,
     )
+    FastLanguageModel.for_inference(model)
 
     for i in range(num_generations):
+        # load the dataset
+        ppl_dataset = Dataset.load_from_disk(
+            DATASET_PATH + f"generated_dataset_{i - 1}"
+        )
+
+        ppl_dataloader = DataLoader(
+            ppl_dataset.with_format("torch"),
+            batch_size=1,
+        )
+
         # add new entry to the dict
         perplexity_dict[f"Generation {i}"] = []
-        # load the model
-        model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=f"{MODEL_PATH}/model_{i}_fp16",
-            max_seq_length=MAX_SEQ_LENGTH,
-            dtype=None,
-            load_in_4bit=True,
-        )
-        FastLanguageModel.for_inference(model)
 
         # calculate the perplexity for every datapoint in the dataset (eval)
         for data_batch in tqdm(ppl_dataloader):
             inputs = tokenizer(
-                data_batch["instruction"],
-                padding=True,
-                truncation=True,
+                data_batch["text"],
                 return_tensors="pt",
             ).to("cuda")
 
@@ -443,7 +455,7 @@ def main(
 
     min_perplexity = min(all_perplexities)
     max_perplexity = max(all_perplexities)
-    bins = torch.linspace(min_perplexity, max_perplexity, len(ppl_dataset_val) + 1)
+    bins = torch.linspace(min_perplexity, max_perplexity, len(ppl_dataset) + 1)
 
     plt.figure(figsize=(14, 8))
     # plot the perplexity for every model as a histogram
@@ -524,6 +536,13 @@ if __name__ == "__main__":
         type=int,
         default=5,
         help="specifies the number of generations to run (default: 5)",
+    )
+    parser.add_argument(
+        "--block_size",
+        "-bs",
+        type=int,
+        default=64,
+        help="specifies the size of the blocks to split the dataset into (default: 64)",
     )
     args = parser.parse_args()
     main(**vars(args))
