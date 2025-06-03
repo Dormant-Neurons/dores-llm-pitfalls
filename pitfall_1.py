@@ -38,7 +38,7 @@ def preprocess_dataset(dataset: Dataset, block_size: int, tokenizer) -> Dataset:
         return tokenizer(examples["response"])
 
     dataset = dataset.select_columns(["response"])
-    dataset.map(tokenize_func, batched=True, num_proc=8, keep_in_memory=True)
+    dataset = dataset.map(tokenize_func, batched=True, num_proc=8, keep_in_memory=True)
 
     # concatenate all data into a list
     concatenated_data = []
