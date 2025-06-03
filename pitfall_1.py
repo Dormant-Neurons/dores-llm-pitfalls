@@ -26,7 +26,7 @@ DATASET_SPECIFIER: str = "bigcode/self-oss-instruct-sc2-exec-filter-50k"
 MAX_SEQ_LENGTH: int = 4096
 MODEL_PATH: str = "./model_outputs/"
 DATASET_PATH: str = "./generated_datasets/"
-EOS_TOKEN: str = None # will be overwritten by the tokenizer
+EOS_TOKEN: str = None  # will be overwritten by the tokenizer
 
 
 def format_prompt(examples: dict) -> dict:
@@ -71,7 +71,7 @@ def main(
 ) -> None:
     """
     Main function to start the pitfall 1 fine-tuning
-    
+
     Args:
         device (str): device to run the computations on (cpu, cuda, mps)
         training_epochs (int): number of training epochs to run
@@ -214,7 +214,7 @@ def main(
         for i in range(num_generations):
             # load the model
             model, tokenizer = FastLanguageModel.from_pretrained(
-                model_name=MODEL_SPECIFIER,# if i == 0 else f"{MODEL_PATH}/model_{i-1}_fp16",
+                model_name=MODEL_SPECIFIER,  # if i == 0 else f"{MODEL_PATH}/model_{i-1}_fp16",
                 max_seq_length=MAX_SEQ_LENGTH,
                 dtype=None,
                 load_in_4bit=True,
@@ -245,7 +245,9 @@ def main(
             # load the dataset
             if i > 0:
                 # if the first training iteration is done, load the generated dataset from the disk
-                dataset = Dataset.load_from_disk(DATASET_PATH+f"generated_dataset_{i-1}")
+                dataset = Dataset.load_from_disk(
+                    DATASET_PATH + f"generated_dataset_{i - 1}"
+                )
             else:
                 dataset = original_dataset
 
@@ -257,7 +259,9 @@ def main(
 
             # for some stats
             gpu_stats = torch.cuda.get_device_properties(0)
-            start_gpu_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
+            start_gpu_memory = round(
+                torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3
+            )
             max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
 
             # create a trainer to train the model
@@ -293,21 +297,29 @@ def main(
             # train the model
             trainer_stats = trainer.train()
             metrics = trainer.evaluate()
-            print(f"## {TColors.OKBLUE}{TColors.BOLD}Metrics: {TColors.ENDC}{metrics["eval_loss"]:.4f} loss")
+            print(
+                f"## {TColors.OKBLUE}{TColors.BOLD}Loss: {TColors.ENDC}{metrics["eval_loss"]:.4f}"
+            )
 
             # print some fancy stats
-            used_memory = round(torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3)
+            used_memory = round(
+                torch.cuda.max_memory_reserved() / 1024 / 1024 / 1024, 3
+            )
             used_memory_for_lora = round(used_memory - start_gpu_memory, 3)
             used_percentage = round(used_memory / max_memory * 100, 3)
             lora_percentage = round(used_memory_for_lora / max_memory * 100, 3)
-            print(f"{trainer_stats.metrics["train_runtime"]} seconds used for training.")
             print(
-                f"{round(trainer_stats.metrics["train_runtime"]/60, 2)} minutes used for training."
+                f"{trainer_stats.metrics["train_runtime"]} seconds used for training."
+            )
+            print(
+                f"{round(trainer_stats.metrics["train_runtime"] / 60, 2)} min. used for training."
             )
             print(f"Peak reserved memory = {used_memory} GB.")
             print(f"Peak reserved memory for training = {used_memory_for_lora} GB.")
             print(f"Peak reserved memory % of max memory = {used_percentage} %.")
-            print(f"Peak reserved memory for training % of max memory = {lora_percentage} %.")
+            print(
+                f"Peak reserved memory for training % of max memory = {lora_percentage} %."
+            )
 
             # save the model
             trainer.model.save_pretrained(
@@ -333,7 +345,9 @@ def main(
                 load_in_4bit=True,
             )
             FastLanguageModel.for_inference(model)
-            print(f"## {TColors.OKBLUE}{TColors.BOLD}Generate Dataset {i}{TColors.ENDC}")
+            print(
+                f"## {TColors.OKBLUE}{TColors.BOLD}Generate Dataset {i}{TColors.ENDC}"
+            )
 
             # ────────────────────────────── generate the new datasets ────────────────────────────
             new_data = []
@@ -364,7 +378,6 @@ def main(
                     max_new_tokens=MAX_SEQ_LENGTH,
                     use_cache=True,
                     temperature=0.01,
-
                 )
                 generated_answers = tokenizer.batch_decode(
                     generated_answers, skip_special_tokens=True
@@ -408,10 +421,7 @@ def main(
 
     # load the original dataset but use only the non-train questions
     # load the dataset
-    ppl_dataset = load_dataset(
-        DATASET_SPECIFIER,
-        split="train"
-    )
+    ppl_dataset = load_dataset(DATASET_SPECIFIER, split="train")
     ppl_dataset = ppl_dataset.select_columns(["instruction", "response"])
     _, ppl_dataset_val = make_splits(ppl_dataset)
 
@@ -451,7 +461,7 @@ def main(
 
     min_perplexity = min(all_perplexities)
     max_perplexity = max(all_perplexities)
-    bins = torch.linspace(min_perplexity, max_perplexity, len(ppl_dataset_val)+1)
+    bins = torch.linspace(min_perplexity, max_perplexity, len(ppl_dataset_val) + 1)
 
     plt.figure(figsize=(14, 8))
     # plot the perplexity for every model as a histogram
@@ -465,9 +475,10 @@ def main(
     plt.tight_layout()
     plt.savefig("perplexity_histogram.png")
 
-    print(f"## {TColors.OKBLUE}{TColors.BOLD}Saved the histogram under: " \
-          f"{TColors.HEADER}./perplexity_histogram.png{TColors.ENDC}")
-
+    print(
+        f"## {TColors.OKBLUE}{TColors.BOLD}Saved the histogram under: "
+        f"{TColors.HEADER}./perplexity_histogram.png{TColors.ENDC}"
+    )
 
     # ────────────────── print the elapsed time ─────────────────────────
     # End the timer
@@ -487,7 +498,6 @@ def main(
     else:
         print(f"{TColors.HEADER}{hours:02}:{minutes:02}:{seconds:02}")
     print(f"{TColors.ENDC}")
-
 
 
 if __name__ == "__main__":
