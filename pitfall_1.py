@@ -429,9 +429,13 @@ def main(
 
     for i in range(num_generations):
         # load the dataset
-        ppl_dataset = Dataset.load_from_disk(
-            DATASET_PATH + f"generated_dataset_{i - 1}"
-        )
+        if i == 0:
+            # for the first generation, use the original dataset
+            ppl_dataset = Dataset.load_from_disk(DATASET_PATH + "original_dataset")
+        else:
+            ppl_dataset = Dataset.load_from_disk(
+                DATASET_PATH + f"generated_dataset_{i-1}"
+            )
 
         ppl_dataloader = DataLoader(
             ppl_dataset.with_format("torch"),
