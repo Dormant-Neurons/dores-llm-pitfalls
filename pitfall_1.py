@@ -522,14 +522,14 @@ if __name__ == "__main__":
         "--dataset_batch_size",
         "-dbs",
         type=int,
-        default=30,
+        default=100,
         help="specifies the batch size for the dataset",
     )
     parser.add_argument(
         "--training_batch_size",
         "-tbs",
         type=int,
-        default=8,
+        default=16,
         help="specifies the batch size for the training/eval",
     )
     parser.add_argument(
@@ -542,7 +542,7 @@ if __name__ == "__main__":
         "--num_generations",
         "-ng",
         type=int,
-        default=5,
+        default=10,
         help="specifies the number of generations to run (default: 5)",
     )
     parser.add_argument(
