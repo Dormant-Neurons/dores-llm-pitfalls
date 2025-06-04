@@ -448,10 +448,10 @@ def main(
 
         # calculate the perplexity for every datapoint in the dataset (eval)
         for data_batch in tqdm(ppl_dataloader):
-            # filter out batches with are not the correct size (block_size)
-            input_list = [batch for batch in data_batch["text"] if len(batch) == block_size]
             inputs = tokenizer(
-                input_list,
+                data_batch["text"],
+                padding=True,
+                truncation=True,
                 return_tensors="pt",
             ).to("cuda")
 
