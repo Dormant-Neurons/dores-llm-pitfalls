@@ -440,7 +440,7 @@ def main(
 
         ppl_dataloader = DataLoader(
             ppl_dataset.with_format("torch"),
-            batch_size=dataset_batch_size,
+            batch_size=1,  # batch size for the perplexity calculation
         )
 
         # add new entry to the dict
