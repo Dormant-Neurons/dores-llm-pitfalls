@@ -410,6 +410,7 @@ def main(
 
             # save the new dataset to disk
             new_dataset = Dataset.from_dict({"text": new_data})
+            new_dataset = preprocess_dataset(new_dataset, block_size, tokenizer)
             new_dataset.save_to_disk(DATASET_PATH + f"generated_dataset_{i}")
 
     # ────────────────── evaluate the models' perplexity and other metrics ─────────────────────────
