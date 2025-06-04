@@ -447,7 +447,7 @@ def main(
         perplexity_dict[f"Generation {i}"] = []
 
         # calculate the perplexity for every datapoint in the dataset (eval)
-        for data_batch in tqdm(ppl_dataloader):
+        for data_batch in tqdm(ppl_dataloader, desc=f"Calculating perplexity for Generation {i}"):
             inputs = tokenizer(
                 data_batch["text"],
                 padding=True,
