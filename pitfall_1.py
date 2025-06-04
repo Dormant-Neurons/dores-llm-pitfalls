@@ -440,7 +440,7 @@ def main(
 
         ppl_dataloader = DataLoader(
             ppl_dataset.with_format("torch"),
-            batch_size=1,
+            batch_size=dataset_batch_size,
         )
 
         # add new entry to the dict
