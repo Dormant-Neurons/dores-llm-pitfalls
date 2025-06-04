@@ -35,9 +35,16 @@ def preprocess_dataset(dataset: Dataset, block_size: int, tokenizer) -> Dataset:
     def tokenize_func(examples: dict) -> dict:
         """Tokenize the dataset examples"""
         # tokenize the data
+        if "response" not in examples.keys():
+            # if the dataset does not have a "response" column, we assume it has a "text" column
+            return tokenizer(examples["text"])
         return tokenizer(examples["response"])
 
-    dataset = dataset.select_columns(["response"])
+    # check if the dataset has the "response" column
+    if "response" not in dataset.column_names:
+        dataset = dataset.select_columns(["text"])
+    else:
+        dataset = dataset.select_columns(["response"])
     dataset = dataset.map(tokenize_func, batched=True, num_proc=8, keep_in_memory=True)
 
     # concatenate all data into a list
