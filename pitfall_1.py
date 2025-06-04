@@ -234,6 +234,7 @@ def main(
 
         # preprocess the dataset
         chunked_dataset = preprocess_dataset(original_dataset, block_size, tokenizer)
+        chunked_dataset.save_to_disk(DATASET_PATH + "chunked_dataset")
         # the dataloader is later used for the generation of the new dataset
         chunked_dataloader = DataLoader(
             chunked_dataset.with_format("torch"),
@@ -431,7 +432,7 @@ def main(
         # load the dataset
         if i == 0:
             # for the first generation, use the original dataset
-            ppl_dataset = Dataset.load_from_disk(DATASET_PATH + "original_dataset")
+            ppl_dataset = Dataset.load_from_disk(DATASET_PATH + "chunked_dataset")
         else:
             ppl_dataset = Dataset.load_from_disk(
                 DATASET_PATH + f"generated_dataset_{i-1}"
