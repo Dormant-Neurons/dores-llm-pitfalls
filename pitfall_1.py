@@ -27,6 +27,21 @@ MODEL_PATH: str = "./model_outputs/"
 DATASET_PATH: str = "./generated_datasets/"
 EOS_TOKEN: str = None  # will be overwritten by the tokenizer
 
+
+def min_max_normalize(d, new_min=0, new_max=1):
+    """Min-max normalize a dictionary of values to a new range [new_min, new_max]"""
+    old_min = min(d.values())
+    old_max = max(d.values())
+    if old_min == old_max:
+        # Avoid division by zero; all values are the same
+        return {k: new_min for k in d}
+
+    return {
+        k: new_min + ((v - old_min) * (new_max - new_min)) / (old_max - old_min)
+        for k, v in d.items()
+    }
+
+
 def preprocess_dataset(dataset: Dataset, block_size: int, tokenizer) -> Dataset:
     """Preprocess the dataset: drop out unnecessary columns and batch the dataset in 
     a predetermined block_size
@@ -469,7 +484,13 @@ def main(
                 loss = outputs.loss
                 perplexity = torch.exp(loss)
                 perplexity_dict[f"Generation {i}"].append(perplexity.item())
-                all_perplexities.append(perplexity.item())
+
+    # normalize the perplexity values
+    perplexity_dict = min_max_normalize(perplexity_dict, new_min=0, new_max=100)
+    # get all single values from the dict and flatten them into a list
+    all_perplexities = [
+        perplexity for values in perplexity_dict.values() for perplexity in values
+    ]
 
     min_perplexity = min(all_perplexities)
     max_perplexity = max(all_perplexities)
