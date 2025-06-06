@@ -88,12 +88,12 @@ def draw_samples(df):
 
 # ───── Prompting ─────
 SYSTEM_PROMPT = (
-    "You are a commit message assistant. I will give you project+commit+function+partial message. "
+    "You are a commit message assistant. I will give you project+commit+partial message. "
     "Predict the full original commit message only. No markdown or explanation."
 )
 
-def build_prompt(code: str, project: str, commit: str, partial_msg: str) -> str:
-    return f"Project: {project}\nCommit: {commit}\nFunction:\n```\n{code}\n```\nPartial commit message: \"{partial_msg}\""
+def build_prompt(project: str, commit: str, partial_msg: str) -> str:
+    return f"Project: {project}\nCommit: {commit}\nPartial commit message: \"{partial_msg}\""
 
 def normalise(txt: str) -> str:
     return "\n".join(l.rstrip() for l in txt.strip().splitlines())
@@ -101,8 +101,8 @@ def normalise(txt: str) -> str:
 def strip_formatting(txt: str) -> str:
     return txt.replace("\n", " ").replace("\t", " ").strip()
 
-def complete(code: str, project: str, commit: str, partial_msg: str) -> str:
-    msg = build_prompt(code, project, commit, partial_msg)
+def complete(project: str, commit: str, partial_msg: str) -> str:
+    msg = build_prompt(project, commit, partial_msg)
     chat = client.chat.completions.create(
         model=MODEL, temperature=TEMPERATURE,
         messages=[{"role": "system", "content": SYSTEM_PROMPT},
@@ -114,13 +114,13 @@ def complete(code: str, project: str, commit: str, partial_msg: str) -> str:
 def evaluate(df: pd.DataFrame, name: str) -> dict:
     exact, dists, sims, bleus, jaccs = [], [], [], [], []
 
-    iterator = zip(df["func"], df["project_url"], df["commit_id"], df["commit_message"])
-    for func, proj, cid, true_msg in tqdm(iterator, total=len(df), desc=f"{name:>18}"):
+    iterator = zip(df["project_url"], df["commit_id"], df["commit_message"])
+    for proj, cid, true_msg in tqdm(iterator, total=len(df), desc=f"{name:>18}"):
         norm_truth = normalise(true_msg)
         hint = " ".join(norm_truth.split()[:len(norm_truth.split()) // 2])
 
         try:
-            pred = normalise(complete(func, proj, cid, hint))
+            pred = normalise(complete(proj, cid, hint))
         except Exception as e:
             print(f"OpenAI error – treating as empty: {e}")
             pred = ""
