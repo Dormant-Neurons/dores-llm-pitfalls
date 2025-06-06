@@ -483,7 +483,7 @@ def main(
     plt.xlabel("Perplexity")
     plt.ylabel("Probability")
     plt.title("Perplexity of generated datapoints over several generations")
-    plt.legend()
+    plt.legend(loc="upper right")
     plt.tight_layout()
     plt.savefig("perplexity_histogram.png")
 
