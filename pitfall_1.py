@@ -28,18 +28,25 @@ DATASET_PATH: str = "./generated_datasets/"
 EOS_TOKEN: str = None  # will be overwritten by the tokenizer
 
 
-def min_max_normalize(d, new_min=0, new_max=1):
+def min_max_normalize(p_dict: dict, all_perplexities: list, new_min: int=0, new_max: int=1):
     """Min-max normalize a dictionary of values to a new range [new_min, new_max]"""
-    old_min = min(d.values())
-    old_max = max(d.values())
-    if old_min == old_max:
-        # Avoid division by zero; all values are the same
-        return {k: new_min for k in d}
+    old_min = min(all_perplexities)
+    old_max = max(all_perplexities)
 
-    return {
-        k: new_min + ((v - old_min) * (new_max - new_min)) / (old_max - old_min)
-        for k, v in d.items()
-    }
+    if old_max == old_min:
+        print(f"{TColors.WARNING}Warning{TColors.ENDC}: Normalization does not work if the old " \
+              "max and min are equal. Returning the original dictionary.")
+        return p_dict
+
+    normalized_dict = {}
+
+    for key, values in p_dict.items():
+        for p_value in values:
+            normalized_dict[key] = new_min + (
+                (p_value - old_min) * (new_max - new_min)
+            ) / (old_max - old_min)
+
+    return normalized_dict
 
 
 def preprocess_dataset(dataset: Dataset, block_size: int, tokenizer) -> Dataset:
@@ -485,9 +492,15 @@ def main(
                 perplexity = torch.exp(loss)
                 perplexity_dict[f"Generation {i}"].append(perplexity.item())
 
-    # normalize the perplexity values
-    perplexity_dict = min_max_normalize(perplexity_dict, new_min=0, new_max=100)
     # get all single values from the dict and flatten them into a list
+    all_perplexities = [
+        perplexity for values in perplexity_dict.values() for perplexity in values
+    ]
+    # normalize the perplexity values
+    perplexity_dict = min_max_normalize(
+        perplexity_dict, all_perplexities, new_min=0, new_max=100
+    )
+    # update the all_perplexities list with the normalized values
     all_perplexities = [
         perplexity for values in perplexity_dict.values() for perplexity in values
     ]
