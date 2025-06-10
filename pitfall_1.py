@@ -552,6 +552,7 @@ def main(
         plt.hist(perplexities, bins=bins, density=True, alpha=0.35, label=name)
 
     plt.xscale("log")
+    plt.yscale("log")
     plt.xlabel("Perplexity")
     plt.ylabel("Probability")
     plt.title("Perplexity of generated datapoints over several generations")
