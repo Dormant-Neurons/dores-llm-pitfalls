@@ -174,12 +174,12 @@ def main(
     if "cpu" in device:
         device = torch.device("cpu", 0)
     elif "cuda" in device and torch.cuda.is_available():
-        if "cuda" in device.split(":"):
+        if "cuda" not in device.split(":")[-1]:
             device = torch.device("cuda", int(device.split(":")[-1]))
         else:
             device = torch.device("cuda", 0)
     elif "mps" in device and torch.backends.mps.is_available():
-        if "mps" in device.split(":"):
+        if "mps" not in device.split(":")[-1]:
             device = torch.device("mps", int(device.split(":")[-1]))
         else:
             device = torch.device("mps", 0)
