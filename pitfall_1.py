@@ -171,12 +171,18 @@ def main(
 
     # ──────────────────────────── set devices and print informations ─────────────────────────
     # set the devices correctly
-    if device == "cpu":
+    if "cpu" in device:
         device = torch.device("cpu", 0)
-    elif device == "cuda" and torch.cuda.is_available():
-        device = torch.device(device, 0)
-    elif device == "mps" and torch.backends.mps.is_available():
-        device = torch.device(device, 0)
+    elif "cuda" in device and torch.cuda.is_available():
+        if "cuda" in device.split(":"):
+            device = torch.device("cuda", device.split(":")[-1])
+        else:
+            device = torch.device("cuda", 0)
+    elif "mps" in device and torch.backends.mps.is_available():
+        if "mps" in device.split(":"):
+            device = torch.device("mps", device.split(":")[-1])
+        else:
+            device = torch.device("mps", 0)
     else:
         print(
             f"{TColors.WARNING}Warning{TColors.ENDC}: Device {TColors.OKCYAN}{device} "
