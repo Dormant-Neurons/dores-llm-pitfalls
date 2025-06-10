@@ -28,29 +28,38 @@ DATASET_PATH: str = "./generated_datasets/"
 EOS_TOKEN: str = None  # will be overwritten by the tokenizer
 
 
-def min_max_normalize(p_dict: dict, all_perplexities: list, new_min: int=0, new_max: int=1):
+def min_max_normalize(
+    p_dict: dict, all_perplexities: list, new_min: int = 0, new_max: int = 1
+):
     """Min-max normalize a dictionary of values to a new range [new_min, new_max]"""
     old_min = min(all_perplexities)
     old_max = max(all_perplexities)
 
     if old_max == old_min:
-        print(f"{TColors.WARNING}Warning{TColors.ENDC}: Normalization does not work if the old " \
-              "max and min are equal. Returning the original dictionary.")
+        print(
+            f"{TColors.WARNING}Warning{TColors.ENDC}: Normalization does not work if the old "
+            "max and min are equal. Returning the original dictionary."
+        )
         return p_dict
 
     normalized_dict = {}
 
     for key, values in p_dict.items():
+        temp_normalized_values = []
+        # normalize each value in the list
         for p_value in values:
-            normalized_dict[key] = new_min + (
-                (p_value - old_min) * (new_max - new_min)
-            ) / (old_max - old_min)
+            temp_normalized_values.append(
+                new_min
+                + ((p_value - old_min) * (new_max - new_min)) / (old_max - old_min)
+            )
+
+        normalized_dict[key] = temp_normalized_values
 
     return normalized_dict
 
 
 def preprocess_dataset(dataset: Dataset, block_size: int, tokenizer) -> Dataset:
-    """Preprocess the dataset: drop out unnecessary columns and batch the dataset in 
+    """Preprocess the dataset: drop out unnecessary columns and batch the dataset in
     a predetermined block_size
     """
 
@@ -90,17 +99,16 @@ def preprocess_dataset(dataset: Dataset, block_size: int, tokenizer) -> Dataset:
 
     # now the list contains tokenized chunks of the dataset, each of size block_size
     # we decode it not back into text
-    chunked_data = [
-        tokenizer.decode(chunk) for chunk in chunked_data
-    ]
+    chunked_data = [tokenizer.decode(chunk) for chunk in chunked_data]
 
     # convert the chunked data into a Dataset
     return Dataset.from_dict({"text": chunked_data})
 
+
 def format_prompt(examples: dict) -> dict:
     """format the dataset inputs for the trainer"""
 
-    completion_data = examples["response"] # we only want the code completion part
+    completion_data = examples["response"]  # we only want the code completion part
     # user_inputs = examples["instruction"]
     # responses = examples["response"]
 
@@ -214,9 +222,7 @@ def main(
     print(
         f"## {TColors.OKBLUE}{TColors.BOLD}Number of Generations{TColors.ENDC}: {num_generations}"
     )
-    print(
-        f"## {TColors.OKBLUE}{TColors.BOLD}Block size{TColors.ENDC}: {block_size}"
-    )
+    print(f"## {TColors.OKBLUE}{TColors.BOLD}Block size{TColors.ENDC}: {block_size}")
     print(
         f"## {TColors.OKBLUE}{TColors.BOLD}Training Steps{TColors.ENDC}: {training_epochs}"
     )
@@ -355,7 +361,7 @@ def main(
             trainer_stats = trainer.train()
             metrics = trainer.evaluate()
             print(
-                f"## {TColors.OKBLUE}{TColors.BOLD}Loss: {TColors.ENDC}{metrics["eval_loss"]:.4f}"
+                f"## {TColors.OKBLUE}{TColors.BOLD}Loss: {TColors.ENDC}{metrics['eval_loss']:.4f}"
             )
 
             # print some fancy stats
@@ -366,10 +372,10 @@ def main(
             used_percentage = round(used_memory / max_memory * 100, 3)
             lora_percentage = round(used_memory_for_lora / max_memory * 100, 3)
             print(
-                f"{trainer_stats.metrics["train_runtime"]} seconds used for training."
+                f"{trainer_stats.metrics['train_runtime']} seconds used for training."
             )
             print(
-                f"{round(trainer_stats.metrics["train_runtime"] / 60, 2)} min. used for training."
+                f"{round(trainer_stats.metrics['train_runtime'] / 60, 2)} min. used for training."
             )
             print(f"Peak reserved memory = {used_memory} GB.")
             print(f"Peak reserved memory for training = {used_memory_for_lora} GB.")
@@ -424,7 +430,7 @@ def main(
 
                 generated_answers = model.generate(
                     **inputs,
-                    #num_beams=5,
+                    # num_beams=5,
                     repetition_penalty=3.0,
                     min_new_tokens=block_size,
                     max_new_tokens=block_size,
@@ -465,7 +471,7 @@ def main(
             ppl_dataset = Dataset.load_from_disk(DATASET_PATH + "chunked_dataset")
         else:
             ppl_dataset = Dataset.load_from_disk(
-                DATASET_PATH + f"generated_dataset_{i-1}"
+                DATASET_PATH + f"generated_dataset_{i - 1}"
             )
 
         ppl_dataloader = DataLoader(
@@ -477,7 +483,9 @@ def main(
         perplexity_dict[f"Generation {i}"] = []
 
         # calculate the perplexity for every datapoint in the dataset (eval)
-        for data_batch in tqdm(ppl_dataloader, desc=f"Calculating perplexity for Generation {i}"):
+        for data_batch in tqdm(
+            ppl_dataloader, desc=f"Calculating perplexity for Generation {i}"
+        ):
             inputs = tokenizer(
                 data_batch["text"],
                 padding=True,
