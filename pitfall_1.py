@@ -561,7 +561,7 @@ def main(
     plt.yscale("log")
     plt.xlabel("Perplexity")
     plt.ylabel("Probability")
-    plt.title("Perplexity of generated datapoints over several generations")
+    plt.title(f"Perplexity of generated datapoints for blocksize of {block_size}")
     plt.legend(loc="upper right")
     plt.tight_layout()
     plt.savefig("perplexity_histogram.png")
