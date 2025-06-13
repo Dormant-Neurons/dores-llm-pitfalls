@@ -270,10 +270,29 @@ def main(
         # load the dataset
         original_dataset = load_dataset(DATASET_SPECIFIER, split="train")
         original_dataset = original_dataset.select_columns(["response"])
+
+        # print some information about the dataset
+        token_counts = []
+        for data in tqdm(original_dataset, desc="Calculating token counts"):
+            inputs = tokenizer(
+                data["response"],
+                padding=True,
+                truncation=True,
+                return_tensors="pt",
+            )
+            # count the tokens
+            token_count = inputs["input_ids"].shape[1]
+            token_counts.append(token_count)
+
+        print(f"Max token count: {max(token_counts)}")
+        print(f"Avg token count: {sum(token_counts) / len(token_counts)}")
+        print(f"Min token count: {min(token_counts)}")
+        print(f"Original dataset length: {len(original_dataset)}\n")
         original_dataset = original_dataset.map(format_prompt, batched=True)
         original_dataset.save_to_disk(DATASET_PATH + "original_dataset")
 
-        print(f"Original dataset length: {len(original_dataset)}")
+        assert block_size > min(token_counts), f"{TColors.FAIL}Block size must be larger than " \
+            f"the minimum token count of the dataset.{TColors.ENDC}"
 
         # preprocess the dataset
         chunked_dataset = preprocess_dataset(original_dataset, block_size, tokenizer)
@@ -583,7 +602,7 @@ def main(
     hours, remainder = divmod(delta.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
 
-    print(f"## {TColors.OKBLUE}{TColors.BOLD} Execution time: ")
+    print(f"## {TColors.OKBLUE}{TColors.BOLD}Execution time: ")
     if days:
         print(f"{TColors.HEADER}{days} days, {hours:02}:{minutes:02}:{seconds:02}")
     else:
