@@ -251,58 +251,57 @@ def main(
     )
     print("#" * os.get_terminal_size().columns + "\n")
 
+    # load the tokenizer to count to tokens of the dataset
+    _, tokenizer = FastLanguageModel.from_pretrained(
+        model_name=MODEL_SPECIFIER,
+        max_seq_length=block_size,
+        dtype=None,
+        load_in_4bit=True,
+    )
+    global EOS_TOKEN
+    EOS_TOKEN = tokenizer.eos_token
+
+    # load the dataset
+    original_dataset = load_dataset(DATASET_SPECIFIER, split="train")
+    original_dataset = original_dataset.select_columns(["response"])
+
+    # print some information about the dataset
+    token_counts = []
+    for data in tqdm(original_dataset, desc="Calculating token counts"):
+        inputs = tokenizer(
+            data["response"],
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
+        )
+        # count the tokens
+        token_count = inputs["input_ids"].shape[1]
+        token_counts.append(token_count)
+
+    print(f"Max token count: {max(token_counts)}")
+    print(f"Avg token count: {sum(token_counts) / len(token_counts)}")
+    print(f"Min token count: {min(token_counts)}")
+    print(f"Original dataset length: {len(original_dataset)}\n")
+    original_dataset = original_dataset.map(format_prompt, batched=True)
+    original_dataset.save_to_disk(DATASET_PATH + "original_dataset")
+
+    assert block_size > min(token_counts), f"{TColors.FAIL}Block size must be larger than " \
+        f"the minimum token count of the dataset.{TColors.ENDC}"
+
+    # preprocess the dataset
+    chunked_dataset = preprocess_dataset(original_dataset, block_size, tokenizer)
+    chunked_dataset.save_to_disk(DATASET_PATH + "chunked_dataset")
+    # the dataloader is later used for the generation of the new dataset
+    chunked_dataloader = DataLoader(
+        chunked_dataset.with_format("torch"),
+        batch_size=dataset_batch_size,
+    )
+
     if not skip_training:
         # ───────────────────────── start the actual finetuning ──────────────────────────────
         # iterte over two loops: first the model training and then the dataset generation
         # the model is trained for N times and after each training the dataset
         # is generated from the new model
-
-        # load the tokenizer to count to tokens of the dataset
-        _, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=MODEL_SPECIFIER,
-            max_seq_length=block_size,
-            dtype=None,
-            load_in_4bit=True,
-        )
-        global EOS_TOKEN
-        EOS_TOKEN = tokenizer.eos_token
-
-        # load the dataset
-        original_dataset = load_dataset(DATASET_SPECIFIER, split="train")
-        original_dataset = original_dataset.select_columns(["response"])
-
-        # print some information about the dataset
-        token_counts = []
-        for data in tqdm(original_dataset, desc="Calculating token counts"):
-            inputs = tokenizer(
-                data["response"],
-                padding=True,
-                truncation=True,
-                return_tensors="pt",
-            )
-            # count the tokens
-            token_count = inputs["input_ids"].shape[1]
-            token_counts.append(token_count)
-
-        print(f"Max token count: {max(token_counts)}")
-        print(f"Avg token count: {sum(token_counts) / len(token_counts)}")
-        print(f"Min token count: {min(token_counts)}")
-        print(f"Original dataset length: {len(original_dataset)}\n")
-        original_dataset = original_dataset.map(format_prompt, batched=True)
-        original_dataset.save_to_disk(DATASET_PATH + "original_dataset")
-
-        assert block_size > min(token_counts), f"{TColors.FAIL}Block size must be larger than " \
-            f"the minimum token count of the dataset.{TColors.ENDC}"
-
-        # preprocess the dataset
-        chunked_dataset = preprocess_dataset(original_dataset, block_size, tokenizer)
-        chunked_dataset.save_to_disk(DATASET_PATH + "chunked_dataset")
-        # the dataloader is later used for the generation of the new dataset
-        chunked_dataloader = DataLoader(
-            chunked_dataset.with_format("torch"),
-            batch_size=dataset_batch_size,
-        )
-
         for i in range(num_generations):
             # load the model
             model, tokenizer = FastLanguageModel.from_pretrained(
