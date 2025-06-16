@@ -150,6 +150,7 @@ def main(
     num_generations: int = 5,
     block_size: int = 64,
     histogram_only: bool = False,
+    test_output_only: bool = False,
 ) -> None:
     """
     Main function to start the pitfall 1 fine-tuning
@@ -163,6 +164,7 @@ def main(
         num_generations (int): number of generations to run (default: 5)
         block_size (int): size of the blocks to split the dataset into (default: 64)
         histogram_only (bool): if True, only generate the histogram and skip the rest
+        test_output_only (bool): if True, only test the output of the model without perplexity stuff
 
     Returns:
         None
@@ -212,7 +214,9 @@ def main(
             f"## {TColors.OKBLUE}{TColors.BOLD}GPU Memory{TColors.ENDC}: "
             f"{torch.cuda.mem_get_info()[1] // 1024**2} MB"
         )
-    elif (device == "mps" or torch.device("mps", 0)) and torch.backends.mps.is_available():
+    elif (
+        device == "mps" or torch.device("mps", 0)
+    ) and torch.backends.mps.is_available():
         print(
             f"## {TColors.OKBLUE}{TColors.BOLD}Shared Memory{TColors.ENDC}: "
             f"{psutil.virtual_memory()[0] // 1024**2} MB"
@@ -285,8 +289,10 @@ def main(
     original_dataset = original_dataset.map(format_prompt, batched=True)
     original_dataset.save_to_disk(DATASET_PATH + f"original_dataset_bs{block_size}")
 
-    assert block_size > min(token_counts), f"{TColors.FAIL}Block size must be larger than " \
+    assert block_size > min(token_counts), (
+        f"{TColors.FAIL}Block size must be larger than "
         f"the minimum token count of the dataset.{TColors.ENDC}"
+    )
 
     # preprocess the dataset
     chunked_dataset = preprocess_dataset(original_dataset, block_size, tokenizer)
@@ -480,122 +486,185 @@ def main(
     # iterate over every model and the generated dataset and calculate the perplexity
     # for the perplexity, every datapoint i.e., the generated answer for every question
     # is evaluated to get the probability for a given perplexity over the whole dataset
-    if not histogram_only:
-        print(f"## {TColors.OKBLUE}{TColors.BOLD}Calculate Perplexity{TColors.ENDC}")
-        perplexity_dict = {}
-        all_perplexities = []
+    if not test_output_only:
+        if not histogram_only:
+            print(
+                f"## {TColors.OKBLUE}{TColors.BOLD}Calculate Perplexity{TColors.ENDC}"
+            )
+            perplexity_dict = {}
+            all_perplexities = []
 
+            model, tokenizer = FastLanguageModel.from_pretrained(
+                model_name=MODEL_SPECIFIER,
+                max_seq_length=block_size,
+                dtype=None,
+                load_in_4bit=True,
+            )
+            FastLanguageModel.for_inference(model)
+
+            for i in range(num_generations):
+                # load the dataset
+                if i == 0:
+                    # for the first generation, use the original dataset
+                    ppl_dataset = Dataset.load_from_disk(
+                        DATASET_PATH + f"chunked_dataset_bs{block_size}"
+                    )
+                else:
+                    ppl_dataset = Dataset.load_from_disk(
+                        DATASET_PATH + f"generated_dataset_{i - 1}_bs{block_size}"
+                    )
+
+                ppl_dataloader = DataLoader(
+                    ppl_dataset.with_format("torch"),
+                    batch_size=1,  # batch size for the perplexity calculation
+                )
+
+                # add new entry to the dict
+                perplexity_dict[f"Generation {i}"] = []
+
+                # calculate the perplexity for every datapoint in the dataset (eval)
+                for data_batch in tqdm(
+                    ppl_dataloader, desc=f"Calculating perplexity for Generation {i}"
+                ):
+                    inputs = tokenizer(
+                        data_batch["text"],
+                        padding=True,
+                        truncation=True,
+                        return_tensors="pt",
+                    ).to("cuda")
+
+                    # calculate the perplexity for every datapoint in the dataset
+                    with torch.no_grad():
+                        outputs = model(**inputs, labels=inputs["input_ids"])
+                        loss = outputs.loss
+                        perplexity = torch.exp(loss)
+                        perplexity_dict[f"Generation {i}"].append(perplexity.item())
+
+            # get all single values from the dict and flatten them into a list
+            all_perplexities = [
+                perplexity
+                for values in perplexity_dict.values()
+                for perplexity in values
+            ]
+            # # normalize the perplexity values
+            # perplexity_dict = min_max_normalize(
+            #     perplexity_dict, all_perplexities, new_min=0, new_max=100
+            # )
+            # # update the all_perplexities list with the normalized values
+            # all_perplexities = [
+            #     perplexity for values in perplexity_dict.values() for perplexity in values
+            # ]
+
+            # save the perplexity dict to a file
+            torch.save(
+                perplexity_dict, DATASET_PATH + f"perplexity_dict_bs{block_size}.pt"
+            )  # save the dict to a file
+            print(
+                f"## {TColors.OKBLUE}{TColors.BOLD}Saved the perplexity dict under: "
+                f"{TColors.HEADER}{DATASET_PATH}perplexity_dict_bs{block_size}.pt{TColors.ENDC}"
+            )
+            # save the all_perplexities list to a file
+            torch.save(
+                all_perplexities, DATASET_PATH + f"all_perplexities_bs{block_size}.pt"
+            )  # save the list to a file
+            print(
+                f"## {TColors.OKBLUE}{TColors.BOLD}Saved the all_perplexities list under: "
+                f"{TColors.HEADER}{DATASET_PATH}all_perplexities_bs{block_size}.pt{TColors.ENDC}"
+            )
+        else:
+            # load the perplexity dict and all_perplexities list from the files
+            perplexity_dict = torch.load(
+                DATASET_PATH + f"perplexity_dict_bs_bs{block_size}.pt"
+            )
+            all_perplexities = torch.load(
+                DATASET_PATH + f"all_perplexities_bs{block_size}.pt"
+            )
+
+        # ────────────────── plot the perplexity histogram ─────────────────────────
+        print(
+            f"## {TColors.OKBLUE}{TColors.BOLD}Plotting Perplexity Histogram{TColors.ENDC}"
+        )
+
+        min_perplexity = min(all_perplexities)
+        max_perplexity = max(all_perplexities)
+        bins = torch.linspace(min_perplexity, max_perplexity, len(all_perplexities) + 1)
+
+        plt.figure(figsize=(14, 8))
+        # plot the perplexity for every model as a histogram
+        for name, perplexities in perplexity_dict.items():
+            plt.hist(perplexities, bins=bins, density=True, alpha=0.35, label=name)
+
+        plt.xscale("log")
+        plt.yscale("log")
+        plt.xlabel("Perplexity")
+        plt.ylabel("Probability")
+        plt.title(f"Perplexity of generated datapoints for blocksize of {block_size}")
+        plt.legend(loc="upper right")
+        plt.tight_layout()
+        plt.savefig(f"perplexity_histogram_bs{block_size}.png")
+
+        print(
+            f"## {TColors.OKBLUE}{TColors.BOLD}Saved the histogram under: "
+            f"{TColors.HEADER}./perplexity_histogram_bs{block_size}.png{TColors.ENDC}"
+        )
+
+    # ────────────────── test the models outputs ─────────────────────────
+    # test the output of the models by generating the code completion for a python
+    # function with a comment explaining what the function should do. This is evaluated for
+    # all generations of the model
+
+    # get a random sample from the original test dataset
+    print(f"## {TColors.OKBLUE}{TColors.BOLD}Testing Model Outputs{TColors.ENDC}")
+    # there is not dedicated test split, but we've never used the instruction columns for
+    # training, so the model did not see these questions before
+    test_dataset = load_dataset(DATASET_SPECIFIER, split="train")
+    test_dataset = test_dataset.select_columns(["instruction"])
+
+    # select a random question from the test dataset
+    test_question = test_dataset.shuffle(seed=1337).select(range(1))[0]["instruction"]
+
+    for model_idx in range(num_generations):
+        # load the model
         model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=MODEL_SPECIFIER,
+            model_name=f"{MODEL_PATH}/model_{model_idx}_bs{block_size}",
             max_seq_length=block_size,
             dtype=None,
             load_in_4bit=True,
         )
         FastLanguageModel.for_inference(model)
 
-        for i in range(num_generations):
-            # load the dataset
-            if i == 0:
-                # for the first generation, use the original dataset
-                ppl_dataset = Dataset.load_from_disk(
-                    DATASET_PATH + f"chunked_dataset_bs{block_size}"
-                )
-            else:
-                ppl_dataset = Dataset.load_from_disk(
-                    DATASET_PATH + f"generated_dataset_{i - 1}_bs{block_size}"
-                )
+        # generate the answer for the test question
+        inputs = tokenizer(
+            test_question,
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
+        ).to("cuda")
 
-            ppl_dataloader = DataLoader(
-                ppl_dataset.with_format("torch"),
-                batch_size=1,  # batch size for the perplexity calculation
-            )
-
-            # add new entry to the dict
-            perplexity_dict[f"Generation {i}"] = []
-
-            # calculate the perplexity for every datapoint in the dataset (eval)
-            for data_batch in tqdm(
-                ppl_dataloader, desc=f"Calculating perplexity for Generation {i}"
-            ):
-                inputs = tokenizer(
-                    data_batch["text"],
-                    padding=True,
-                    truncation=True,
-                    return_tensors="pt",
-                ).to("cuda")
-
-                # calculate the perplexity for every datapoint in the dataset
-                with torch.no_grad():
-                    outputs = model(**inputs, labels=inputs["input_ids"])
-                    loss = outputs.loss
-                    perplexity = torch.exp(loss)
-                    perplexity_dict[f"Generation {i}"].append(perplexity.item())
-
-        # get all single values from the dict and flatten them into a list
-        all_perplexities = [
-            perplexity for values in perplexity_dict.values() for perplexity in values
-        ]
-        # # normalize the perplexity values
-        # perplexity_dict = min_max_normalize(
-        #     perplexity_dict, all_perplexities, new_min=0, new_max=100
-        # )
-        # # update the all_perplexities list with the normalized values
-        # all_perplexities = [
-        #     perplexity for values in perplexity_dict.values() for perplexity in values
-        # ]
-
-        # save the perplexity dict to a file
-        torch.save(
-            perplexity_dict, DATASET_PATH + f"perplexity_dict_bs{block_size}.pt"
-        )  # save the dict to a file
-        print(
-            f"## {TColors.OKBLUE}{TColors.BOLD}Saved the perplexity dict under: "
-            f"{TColors.HEADER}{DATASET_PATH}perplexity_dict_bs{block_size}.pt{TColors.ENDC}"
-        )
-        # save the all_perplexities list to a file
-        torch.save(
-            all_perplexities, DATASET_PATH + f"all_perplexities_bs{block_size}.pt"
-        )  # save the list to a file
-        print(
-            f"## {TColors.OKBLUE}{TColors.BOLD}Saved the all_perplexities list under: "
-            f"{TColors.HEADER}{DATASET_PATH}all_perplexities_bs{block_size}.pt{TColors.ENDC}"
-        )
-    else:
-        # load the perplexity dict and all_perplexities list from the files
-        perplexity_dict = torch.load(
-            DATASET_PATH + f"perplexity_dict_bs_bs{block_size}.pt"
-        )
-        all_perplexities = torch.load(
-            DATASET_PATH + f"all_perplexities_bs{block_size}.pt"
+        generated_answer = model.generate(
+            **inputs,
+            repetition_penalty=3.0,
+            min_new_tokens=block_size,
+            max_new_tokens=4096,
+            use_cache=True,
         )
 
-    # ────────────────── plot the perplexity histogram ─────────────────────────
-    print(
-        f"## {TColors.OKBLUE}{TColors.BOLD}Plotting Perplexity Histogram{TColors.ENDC}"
-    )
+        # decode the generated answer
+        generated_answer = tokenizer.batch_decode(
+            generated_answer, skip_special_tokens=True
+        )
 
-    min_perplexity = min(all_perplexities)
-    max_perplexity = max(all_perplexities)
-    bins = torch.linspace(min_perplexity, max_perplexity, len(all_perplexities) + 1)
+        print(f"Question: {test_question}")
+        print(f"Generation {model_idx} answer: {generated_answer[0]}")
 
-    plt.figure(figsize=(14, 8))
-    # plot the perplexity for every model as a histogram
-    for name, perplexities in perplexity_dict.items():
-        plt.hist(perplexities, bins=bins, density=True, alpha=0.35, label=name)
-
-    plt.xscale("log")
-    plt.yscale("log")
-    plt.xlabel("Perplexity")
-    plt.ylabel("Probability")
-    plt.title(f"Perplexity of generated datapoints for blocksize of {block_size}")
-    plt.legend(loc="upper right")
-    plt.tight_layout()
-    plt.savefig(f"perplexity_histogram_bs{block_size}.png")
-
-    print(
-        f"## {TColors.OKBLUE}{TColors.BOLD}Saved the histogram under: "
-        f"{TColors.HEADER}./perplexity_histogram_bs{block_size}.png{TColors.ENDC}"
-    )
+        # save the question and answer to a file
+        with open(
+            file=f"{MODEL_PATH}/model_out_{model_idx}_bs{block_size}.txt",
+            mode="w",
+            encoding="utf-8",
+        ) as f:
+            f.write(f"Question: {test_question}\n")
+            f.write(f"Generation {model_idx} answer: {generated_answer[0]}\n")
 
     # ────────────────── print the elapsed time ─────────────────────────
     # End the timer
