@@ -742,5 +742,11 @@ if __name__ == "__main__":
         action="store_true",
         help="if set, only generate the histogram and skip the rest",
     )
+    parser.add_argument(
+        "--test_output_only",
+        "-to",
+        action="store_true",
+        help="if set, only test the output of the model without perplexity stuff",
+    )
     args = parser.parse_args()
     main(**vars(args))
