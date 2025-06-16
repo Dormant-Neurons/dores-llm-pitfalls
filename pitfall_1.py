@@ -644,8 +644,7 @@ def main(
         generated_answer = model.generate(
             **inputs,
             repetition_penalty=3.0,
-            min_new_tokens=block_size,
-            max_new_tokens=4096,
+            max_new_tokens=block_size,
             use_cache=True,
         )
 
