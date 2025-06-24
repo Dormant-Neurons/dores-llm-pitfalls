@@ -151,7 +151,8 @@ def main(
     block_size: int = 64,
     histogram_only: bool = False,
     test_output_only: bool = False,
-    data_path: str = DATASET_PATH,
+    data_path: str = "",
+    use_original_dataset: bool = False,
 ) -> None:
     """
     Main function to start the pitfall 1 fine-tuning
@@ -167,6 +168,7 @@ def main(
         histogram_only (bool): if True, only generate the histogram and skip the rest
         test_output_only (bool): if True, only test the output of the model without perplexity stuff
         data_path (str): path to save the generated datasets and models
+        use_original_dataset (bool): if True, use the original datainstead of the synthetic dataset
 
     Returns:
         None
@@ -244,6 +246,15 @@ def main(
         + "#" * (os.get_terminal_size().columns - 14)
     )
     print(
+        f"## {TColors.OKBLUE}{TColors.BOLD}Model Specifier{TColors.ENDC}: {MODEL_SPECIFIER}"
+    )
+    print(
+        f"## {TColors.OKBLUE}{TColors.BOLD}Dataset Specifier{TColors.ENDC}: {DATASET_SPECIFIER}"
+    )
+    print(
+        f"## {TColors.OKBLUE}{TColors.BOLD}Use Original Data{TColors.ENDC}: {use_original_dataset}"
+    )
+    print(
         f"## {TColors.OKBLUE}{TColors.BOLD}Number of Generations{TColors.ENDC}: {num_generations}"
     )
     print(f"## {TColors.OKBLUE}{TColors.BOLD}Block size{TColors.ENDC}: {block_size}")
@@ -253,7 +264,7 @@ def main(
     print(
         f"## {TColors.OKBLUE}{TColors.BOLD}Dataset Batch Size{TColors.ENDC}: {dataset_batch_size}"
     )
-    print(
+    print( 
         f"## {TColors.OKBLUE}{TColors.BOLD}Training Batch Size{TColors.ENDC}: {training_batch_size}"
     )
     print(
@@ -352,7 +363,7 @@ def main(
             )
 
             # load the dataset
-            if i > 0:
+            if i > 0 and not use_original_dataset:
                 # if the first training iteration is done, load the generated dataset from the disk
                 dataset = Dataset.load_from_disk(
                     DATASET_PATH + f"generated_dataset_{i - 1}_bs{block_size}"
@@ -452,47 +463,47 @@ def main(
                 load_in_4bit=True,
             )
             FastLanguageModel.for_inference(model)
-            print(
-                f"## {TColors.OKBLUE}{TColors.BOLD}Generate Dataset {i}{TColors.ENDC}"
-            )
-
             # ────────────────────────────── generate the new datasets ────────────────────────────
-            new_data = []
-            for _, data_batch in tqdm(
-                enumerate(chunked_dataloader), total=len(chunked_dataloader)
-            ):
-                # tokenize the data batch
-                inputs = list(data_batch["text"])
-
-                # generate the answer using the model
-                inputs = tokenizer(
-                    inputs,
-                    padding=True,
-                    truncation=True,
-                    return_tensors="pt",
-                ).to("cuda")
-
-                generated_answers = model.generate(
-                    **inputs,
-                    # num_beams=5,
-                    repetition_penalty=3.0,
-                    min_new_tokens=block_size,
-                    max_new_tokens=block_size,
-                    use_cache=True,
+            if not use_original_dataset:
+                print(
+                    f"## {TColors.OKBLUE}{TColors.BOLD}Generate Dataset {i}{TColors.ENDC}"
                 )
+                new_data = []
+                for _, data_batch in tqdm(
+                    enumerate(chunked_dataloader), total=len(chunked_dataloader)
+                ):
+                    # tokenize the data batch
+                    inputs = list(data_batch["text"])
 
-                # only keep and decode the last 64 tokens of the generated answer
-                generated_answers = generated_answers[:, 64:]
-                generated_answers = tokenizer.batch_decode(generated_answers)
+                    # generate the answer using the model
+                    inputs = tokenizer(
+                        inputs,
+                        padding=True,
+                        truncation=True,
+                        return_tensors="pt",
+                    ).to("cuda")
 
-                new_data += list(generated_answers)
+                    generated_answers = model.generate(
+                        **inputs,
+                        # num_beams=5,
+                        repetition_penalty=3.0,
+                        min_new_tokens=block_size,
+                        max_new_tokens=block_size,
+                        use_cache=True,
+                    )
 
-            # save the new dataset to disk
-            new_dataset = Dataset.from_dict({"text": new_data})
-            new_dataset = preprocess_dataset(new_dataset, block_size, tokenizer)
-            new_dataset.save_to_disk(
-                DATASET_PATH + f"generated_dataset_{i}_bs{block_size}"
-            )
+                    # only keep and decode the last 64 tokens of the generated answer
+                    generated_answers = generated_answers[:, 64:]
+                    generated_answers = tokenizer.batch_decode(generated_answers)
+
+                    new_data += list(generated_answers)
+
+                # save the new dataset to disk
+                new_dataset = Dataset.from_dict({"text": new_data})
+                new_dataset = preprocess_dataset(new_dataset, block_size, tokenizer)
+                new_dataset.save_to_disk(
+                    DATASET_PATH + f"generated_dataset_{i}_bs{block_size}"
+                )
 
     # ────────────────── evaluate the models' perplexity and other metrics ─────────────────────────
     # iterate over every model and the generated dataset and calculate the perplexity
@@ -516,7 +527,7 @@ def main(
 
             for i in range(num_generations):
                 # load the dataset
-                if i == 0:
+                if i == 0 or use_original_dataset:
                     # for the first generation, use the original dataset
                     ppl_dataset = Dataset.load_from_disk(
                         DATASET_PATH + f"chunked_dataset_bs{block_size}"
@@ -765,6 +776,12 @@ if __name__ == "__main__":
         type=str,
         default="",
         help="path to save the generated datasets and models (default: current directory)",
+    )
+    parser.add_argument(
+        "--use_original_dataset",
+        "-uod",
+        action="store_true",
+        help="if set, use the original dataset instead of the synthetic dataset",
     )
     args = parser.parse_args()
     main(**vars(args))
