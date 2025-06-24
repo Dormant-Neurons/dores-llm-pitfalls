@@ -151,6 +151,7 @@ def main(
     block_size: int = 64,
     histogram_only: bool = False,
     test_output_only: bool = False,
+    data_path: str = DATASET_PATH,
 ) -> None:
     """
     Main function to start the pitfall 1 fine-tuning
@@ -165,6 +166,7 @@ def main(
         block_size (int): size of the blocks to split the dataset into (default: 64)
         histogram_only (bool): if True, only generate the histogram and skip the rest
         test_output_only (bool): if True, only test the output of the model without perplexity stuff
+        data_path (str): path to save the generated datasets and models
 
     Returns:
         None
@@ -191,6 +193,16 @@ def main(
             f"{TColors.ENDC}is not available. Setting device to CPU instead."
         )
         device = torch.device("cpu", 0)
+
+    # set data paths
+    if data_path != "":
+        global DATASET_PATH
+        DATASET_PATH = os.path.join(data_path, "generated_datasets/")
+        global MODEL_PATH
+        MODEL_PATH = os.path.join(data_path, "model_outputs/")
+        # create the directories if they do not exist
+        os.makedirs(DATASET_PATH, exist_ok=True)
+        os.makedirs(MODEL_PATH, exist_ok=True)
 
     # have a nice system status print
     print(
@@ -746,6 +758,13 @@ if __name__ == "__main__":
         "-to",
         action="store_true",
         help="if set, only test the output of the model without perplexity stuff",
+    )
+    parser.add_argument(
+        "--data_path",
+        "-dp",
+        type=str,
+        default="",
+        help="path to save the generated datasets and models (default: current directory)",
     )
     args = parser.parse_args()
     main(**vars(args))
