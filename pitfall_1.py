@@ -264,7 +264,7 @@ def main(
     print(
         f"## {TColors.OKBLUE}{TColors.BOLD}Dataset Batch Size{TColors.ENDC}: {dataset_batch_size}"
     )
-    print( 
+    print(
         f"## {TColors.OKBLUE}{TColors.BOLD}Training Batch Size{TColors.ENDC}: {training_batch_size}"
     )
     print(
