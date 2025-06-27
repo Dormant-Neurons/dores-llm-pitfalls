@@ -604,7 +604,7 @@ def main(
         else:
             # load the perplexity dict and all_perplexities list from the files
             perplexity_dict = torch.load(
-                DATASET_PATH + f"perplexity_dict_bs_bs{block_size}.pt"
+                DATASET_PATH + f"perplexity_dict_bs{block_size}.pt"
             )
             all_perplexities = torch.load(
                 DATASET_PATH + f"all_perplexities_bs{block_size}.pt"
