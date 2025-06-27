@@ -517,15 +517,22 @@ def main(
             perplexity_dict = {}
             all_perplexities = []
 
-            model, tokenizer = FastLanguageModel.from_pretrained(
-                model_name=MODEL_SPECIFIER,
-                max_seq_length=block_size,
-                dtype=None,
-                load_in_4bit=True,
-            )
-            FastLanguageModel.for_inference(model)
 
             for i in range(num_generations):
+                # load the model
+                model_name = (
+                    f"{MODEL_PATH}/model_{i}_bs{block_size}"
+                    if i > 0 and not use_original_dataset
+                    else MODEL_SPECIFIER
+                )
+                model, tokenizer = FastLanguageModel.from_pretrained(
+                    model_name=model_name,
+                    max_seq_length=block_size,
+                    dtype=None,
+                    load_in_4bit=True,
+                )
+                FastLanguageModel.for_inference(model)
+
                 # load the dataset
                 if i == 0 or use_original_dataset:
                     # for the first generation, use the original dataset
@@ -631,62 +638,62 @@ def main(
             f"{TColors.HEADER}./perplexity_histogram_bs{block_size}.png{TColors.ENDC}"
         )
 
-    # ────────────────── test the models outputs ─────────────────────────
-    # test the output of the models by generating the code completion for a python
-    # function with a comment explaining what the function should do. This is evaluated for
-    # all generations of the model
+    # # ────────────────── test the models outputs ─────────────────────────
+    # # test the output of the models by generating the code completion for a python
+    # # function with a comment explaining what the function should do. This is evaluated for
+    # # all generations of the model
 
-    # get a random sample from the original test dataset
-    print(f"## {TColors.OKBLUE}{TColors.BOLD}Testing Model Outputs{TColors.ENDC}")
-    # there is not dedicated test split, but we've never used the instruction columns for
-    # training, so the model did not see these questions before
-    test_dataset = load_dataset(DATASET_SPECIFIER, split="train")
-    test_dataset = test_dataset.select_columns(["instruction"])
+    # # get a random sample from the original test dataset
+    # print(f"## {TColors.OKBLUE}{TColors.BOLD}Testing Model Outputs{TColors.ENDC}")
+    # # there is not dedicated test split, but we've never used the instruction columns for
+    # # training, so the model did not see these questions before
+    # test_dataset = load_dataset(DATASET_SPECIFIER, split="train")
+    # test_dataset = test_dataset.select_columns(["instruction"])
 
-    # select a random question from the test dataset
-    test_question = test_dataset.shuffle(seed=1337).select(range(1))[0]["instruction"]
+    # # select a random question from the test dataset
+    # test_question = test_dataset.shuffle(seed=1337).select(range(1))[0]["instruction"]
 
-    for model_idx in range(num_generations):
-        # load the model
-        model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=f"{MODEL_PATH}/model_{model_idx}_bs{block_size}",
-            max_seq_length=block_size,
-            dtype=None,
-            load_in_4bit=True,
-        )
-        FastLanguageModel.for_inference(model)
+    # for model_idx in range(num_generations):
+    #     # load the model
+    #     model, tokenizer = FastLanguageModel.from_pretrained(
+    #         model_name=f"{MODEL_PATH}/model_{model_idx}_bs{block_size}",
+    #         max_seq_length=block_size,
+    #         dtype=None,
+    #         load_in_4bit=True,
+    #     )
+    #     FastLanguageModel.for_inference(model)
 
-        # generate the answer for the test question
-        inputs = tokenizer(
-            test_question,
-            padding=True,
-            truncation=True,
-            return_tensors="pt",
-        ).to("cuda")
+    #     # generate the answer for the test question
+    #     inputs = tokenizer(
+    #         test_question,
+    #         padding=True,
+    #         truncation=True,
+    #         return_tensors="pt",
+    #     ).to("cuda")
 
-        generated_answer = model.generate(
-            **inputs,
-            repetition_penalty=3.0,
-            max_new_tokens=block_size,
-            use_cache=True,
-        )
+    #     generated_answer = model.generate(
+    #         **inputs,
+    #         repetition_penalty=3.0,
+    #         max_new_tokens=block_size,
+    #         use_cache=True,
+    #     )
 
-        # decode the generated answer
-        generated_answer = tokenizer.batch_decode(
-            generated_answer, skip_special_tokens=True
-        )
+    #     # decode the generated answer
+    #     generated_answer = tokenizer.batch_decode(
+    #         generated_answer, skip_special_tokens=True
+    #     )
 
-        print(f"Question: {test_question}")
-        print(f"Generation {model_idx} answer: {generated_answer[0]}")
+    #     print(f"Question: {test_question}")
+    #     print(f"Generation {model_idx} answer: {generated_answer[0]}")
 
-        # save the question and answer to a file
-        with open(
-            file=f"{MODEL_PATH}/model_out_{model_idx}_bs{block_size}.txt",
-            mode="w",
-            encoding="utf-8",
-        ) as f:
-            f.write(f"Question: {test_question}\n")
-            f.write(f"Generation {model_idx} answer: {generated_answer[0]}\n")
+    #     # save the question and answer to a file
+    #     with open(
+    #         file=f"{MODEL_PATH}/model_out_{model_idx}_bs{block_size}.txt",
+    #         mode="w",
+    #         encoding="utf-8",
+    #     ) as f:
+    #         f.write(f"Question: {test_question}\n")
+    #         f.write(f"Generation {model_idx} answer: {generated_answer[0]}\n")
 
     # ────────────────── print the elapsed time ─────────────────────────
     # End the timer
