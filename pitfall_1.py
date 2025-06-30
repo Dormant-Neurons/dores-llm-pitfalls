@@ -690,7 +690,7 @@ def main(
                 samples.append({"task_id": task_id, "completion": generated_answer})
 
         write_jsonl(
-            samples, f"{DATASET_PATH}eval_samples_gen{model_idx}_bs{block_size}.jsonl"
+            f"{DATASET_PATH}eval_samples_gen{model_idx}_bs{block_size}.jsonl", samples
         )
 
     # ────────────────── print the elapsed time ─────────────────────────
