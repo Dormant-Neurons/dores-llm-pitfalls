@@ -648,6 +648,14 @@ def main(
 
     samples = []
     for model_idx in range(num_generations):
+        # load the model
+        model, tokenizer = FastLanguageModel.from_pretrained(
+            model_name=f"{MODEL_PATH}model_{model_idx}_bs{block_size}",
+            max_seq_length=2048,
+            dtype=None,
+            load_in_4bit=True,
+        )
+        FastLanguageModel.for_inference(model)
         print(
             f"## {TColors.OKBLUE}{TColors.BOLD}Generating samples for model {model_idx} "\
             f"{TColors.ENDC}"
@@ -659,15 +667,6 @@ def main(
         ):
             # create x samples for each problem
             for _ in range(100):
-                # load the model
-                model, tokenizer = FastLanguageModel.from_pretrained(
-                    model_name=f"{MODEL_PATH}model_{model_idx}_bs{block_size}",
-                    max_seq_length=block_size,
-                    dtype=None,
-                    load_in_4bit=True,
-                )
-                FastLanguageModel.for_inference(model)
-
                 # generate the answer for the test question
                 inputs = tokenizer(
                     problems[task_id]["prompt"],
@@ -679,7 +678,7 @@ def main(
                 generated_answer = model.generate(
                     **inputs,
                     repetition_penalty=3.0,
-                    max_new_tokens=block_size,
+                    max_new_tokens=2048,
                     use_cache=True,
                 )
 
