@@ -665,8 +665,8 @@ def main(
             desc="Generating samples from the models",
             total=len(problems)
         ):
-            # create x samples for each problem
-            for _ in range(100):
+            # create x samples for each problem (how often to generate the answer)
+            for _ in range(1):
                 # generate the answer for the test question
                 inputs = tokenizer(
                     problems[task_id]["prompt"],
