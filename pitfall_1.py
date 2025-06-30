@@ -24,8 +24,8 @@ from human_eval.data import write_jsonl, read_problems
 
 MODEL_SPECIFIER: str = "unsloth/Qwen2.5-Coder-0.5B"
 DATASET_SPECIFIER: str = "bigcode/self-oss-instruct-sc2-exec-filter-50k"
-MODEL_PATH: str = "./model_outputs"
-DATASET_PATH: str = "./generated_datasets"
+MODEL_PATH: str = "./model_outputs/"
+DATASET_PATH: str = "./generated_datasets/"
 EOS_TOKEN: str = None  # will be overwritten by the tokenizer
 
 
