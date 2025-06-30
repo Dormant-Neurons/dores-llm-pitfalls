@@ -24,8 +24,8 @@ from human_eval.data import write_jsonl, read_problems
 
 MODEL_SPECIFIER: str = "unsloth/Qwen2.5-Coder-0.5B"
 DATASET_SPECIFIER: str = "bigcode/self-oss-instruct-sc2-exec-filter-50k"
-MODEL_PATH: str = "./model_outputs/"
-DATASET_PATH: str = "./generated_datasets/"
+MODEL_PATH: str = "./model_outputs"
+DATASET_PATH: str = "./generated_datasets"
 EOS_TOKEN: str = None  # will be overwritten by the tokenizer
 
 
@@ -200,9 +200,9 @@ def main(
     # set data paths
     if data_path != "":
         global DATASET_PATH
-        DATASET_PATH = os.path.join(data_path, "generated_datasets/")
+        DATASET_PATH = os.path.join(data_path, "generated_datasets")
         global MODEL_PATH
-        MODEL_PATH = os.path.join(data_path, "model_outputs/")
+        MODEL_PATH = os.path.join(data_path, "model_outputs")
         # create the directories if they do not exist
         os.makedirs(DATASET_PATH, exist_ok=True)
         os.makedirs(MODEL_PATH, exist_ok=True)
@@ -311,7 +311,7 @@ def main(
     print(f"Min token count: {min(token_counts)}")
     print(f"Original dataset length: {len(original_dataset)}\n")
     original_dataset = original_dataset.map(format_prompt, batched=True)
-    original_dataset.save_to_disk(DATASET_PATH + f"original_dataset_bs{block_size}")
+    original_dataset.save_to_disk(DATASET_PATH + f"/original_dataset_bs{block_size}")
 
     assert block_size > min(token_counts), (
         f"{TColors.FAIL}Block size must be larger than "
@@ -320,7 +320,7 @@ def main(
 
     # preprocess the dataset
     chunked_dataset = preprocess_dataset(original_dataset, block_size, tokenizer)
-    chunked_dataset.save_to_disk(DATASET_PATH + f"chunked_dataset_bs{block_size}")
+    chunked_dataset.save_to_disk(DATASET_PATH + f"/chunked_dataset_bs{block_size}")
     # the dataloader is later used for the generation of the new dataset
     chunked_dataloader = DataLoader(
         chunked_dataset.with_format("torch"),
@@ -367,7 +367,7 @@ def main(
             if i > 0 and not use_original_dataset:
                 # if the first training iteration is done, load the generated dataset from the disk
                 dataset = Dataset.load_from_disk(
-                    DATASET_PATH + f"generated_dataset_{i - 1}_bs{block_size}"
+                    DATASET_PATH + f"/generated_dataset_{i - 1}_bs{block_size}"
                 )
             else:
                 dataset = chunked_dataset
@@ -538,11 +538,11 @@ def main(
                 if i == 0 or use_original_dataset:
                     # for the first generation, use the original dataset
                     ppl_dataset = Dataset.load_from_disk(
-                        DATASET_PATH + f"chunked_dataset_bs{block_size}"
+                        DATASET_PATH + f"/chunked_dataset_bs{block_size}"
                     )
                 else:
                     ppl_dataset = Dataset.load_from_disk(
-                        DATASET_PATH + f"generated_dataset_{i - 1}_bs{block_size}"
+                        DATASET_PATH + f"/generated_dataset_{i - 1}_bs{block_size}"
                     )
 
                 ppl_dataloader = DataLoader(
@@ -588,27 +588,27 @@ def main(
 
             # save the perplexity dict to a file
             torch.save(
-                perplexity_dict, DATASET_PATH + f"perplexity_dict_bs{block_size}.pt"
+                perplexity_dict, DATASET_PATH + f"/perplexity_dict_bs{block_size}.pt"
             )  # save the dict to a file
             print(
                 f"## {TColors.OKBLUE}{TColors.BOLD}Saved the perplexity dict under: "
-                f"{TColors.HEADER}{DATASET_PATH}perplexity_dict_bs{block_size}.pt{TColors.ENDC}"
+                f"{TColors.HEADER}{DATASET_PATH}/perplexity_dict_bs{block_size}.pt{TColors.ENDC}"
             )
             # save the all_perplexities list to a file
             torch.save(
-                all_perplexities, DATASET_PATH + f"all_perplexities_bs{block_size}.pt"
+                all_perplexities, DATASET_PATH + f"/all_perplexities_bs{block_size}.pt"
             )  # save the list to a file
             print(
                 f"## {TColors.OKBLUE}{TColors.BOLD}Saved the all_perplexities list under: "
-                f"{TColors.HEADER}{DATASET_PATH}all_perplexities_bs{block_size}.pt{TColors.ENDC}"
+                f"{TColors.HEADER}{DATASET_PATH}/all_perplexities_bs{block_size}.pt{TColors.ENDC}"
             )
         else:
             # load the perplexity dict and all_perplexities list from the files
             perplexity_dict = torch.load(
-                DATASET_PATH + f"perplexity_dict_bs{block_size}.pt"
+                DATASET_PATH + f"/perplexity_dict_bs{block_size}.pt"
             )
             all_perplexities = torch.load(
-                DATASET_PATH + f"all_perplexities_bs{block_size}.pt"
+                DATASET_PATH + f"/all_perplexities_bs{block_size}.pt"
             )
 
         # ────────────────── plot the perplexity histogram ─────────────────────────
@@ -691,7 +691,7 @@ def main(
                 samples.append({"task_id": task_id, "completion": generated_answer})
 
         write_jsonl(
-            samples, f"{DATASET_PATH} + he_samples_gen{model_idx}_bs{block_size}.jsonl"
+            samples, f"{DATASET_PATH}/eval_samples_gen{model_idx}_bs{block_size}.jsonl"
         )
 
     # ────────────────── print the elapsed time ─────────────────────────
