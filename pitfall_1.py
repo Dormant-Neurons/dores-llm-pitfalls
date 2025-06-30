@@ -20,6 +20,7 @@ from transformers import TrainingArguments
 from datasets import load_dataset, Dataset
 
 from utils.colors import TColors
+from human_eval.data import write_jsonl, read_problems
 
 MODEL_SPECIFIER: str = "unsloth/Qwen2.5-Coder-0.5B"
 DATASET_SPECIFIER: str = "bigcode/self-oss-instruct-sc2-exec-filter-50k"
@@ -150,7 +151,7 @@ def main(
     num_generations: int = 5,
     block_size: int = 64,
     histogram_only: bool = False,
-    test_output_only: bool = False,
+    human_eval_only: bool = False,
     data_path: str = "",
     use_original_dataset: bool = False,
 ) -> None:
@@ -166,7 +167,7 @@ def main(
         num_generations (int): number of generations to run (default: 5)
         block_size (int): size of the blocks to split the dataset into (default: 64)
         histogram_only (bool): if True, only generate the histogram and skip the rest
-        test_output_only (bool): if True, only test the output of the model without perplexity stuff
+        human_eval_only (bool): if True, only generate human eval samples and skip the rest
         data_path (str): path to save the generated datasets and models
         use_original_dataset (bool): if True, use the original datainstead of the synthetic dataset
 
@@ -509,7 +510,7 @@ def main(
     # iterate over every model and the generated dataset and calculate the perplexity
     # for the perplexity, every datapoint i.e., the generated answer for every question
     # is evaluated to get the probability for a given perplexity over the whole dataset
-    if not test_output_only:
+    if not human_eval_only:
         if not histogram_only:
             print(
                 f"## {TColors.OKBLUE}{TColors.BOLD}Calculate Perplexity{TColors.ENDC}"
@@ -639,61 +640,59 @@ def main(
         )
 
     # # ────────────────── test the models outputs ─────────────────────────
-    # # test the output of the models by generating the code completion for a python
-    # # function with a comment explaining what the function should do. This is evaluated for
-    # # all generations of the model
+    # this generates samples based on the human eval dataset from OpenAI
+    # the samples are then evaluated using the evaluate library
+    # https://github.com/openai/human-eval
 
-    # # get a random sample from the original test dataset
-    # print(f"## {TColors.OKBLUE}{TColors.BOLD}Testing Model Outputs{TColors.ENDC}")
-    # # there is not dedicated test split, but we've never used the instruction columns for
-    # # training, so the model did not see these questions before
-    # test_dataset = load_dataset(DATASET_SPECIFIER, split="train")
-    # test_dataset = test_dataset.select_columns(["instruction"])
+    problems = read_problems()
 
-    # # select a random question from the test dataset
-    # test_question = test_dataset.shuffle(seed=1337).select(range(1))[0]["instruction"]
+    samples = []
+    for model_idx in range(num_generations):
+        print(
+            f"## {TColors.OKBLUE}{TColors.BOLD}Generating samples for model {model_idx} "\
+            f"{TColors.ENDC}"
+        )
+        for task_id in tqdm(
+            problems,
+            desc="Generating samples from the models",
+            total=len(problems)
+        ):
+            # create x samples for each problem
+            for _ in range(100):
+                # load the model
+                model, tokenizer = FastLanguageModel.from_pretrained(
+                    model_name=f"{MODEL_PATH}/model_{model_idx}_bs{block_size}",
+                    max_seq_length=block_size,
+                    dtype=None,
+                    load_in_4bit=True,
+                )
+                FastLanguageModel.for_inference(model)
 
-    # for model_idx in range(num_generations):
-    #     # load the model
-    #     model, tokenizer = FastLanguageModel.from_pretrained(
-    #         model_name=f"{MODEL_PATH}/model_{model_idx}_bs{block_size}",
-    #         max_seq_length=block_size,
-    #         dtype=None,
-    #         load_in_4bit=True,
-    #     )
-    #     FastLanguageModel.for_inference(model)
+                # generate the answer for the test question
+                inputs = tokenizer(
+                    problems[task_id]["prompt"],
+                    padding=True,
+                    truncation=True,
+                    return_tensors="pt",
+                ).to("cuda")
 
-    #     # generate the answer for the test question
-    #     inputs = tokenizer(
-    #         test_question,
-    #         padding=True,
-    #         truncation=True,
-    #         return_tensors="pt",
-    #     ).to("cuda")
+                generated_answer = model.generate(
+                    **inputs,
+                    repetition_penalty=3.0,
+                    max_new_tokens=block_size,
+                    use_cache=True,
+                )
 
-    #     generated_answer = model.generate(
-    #         **inputs,
-    #         repetition_penalty=3.0,
-    #         max_new_tokens=block_size,
-    #         use_cache=True,
-    #     )
+                # decode the generated answer
+                generated_answer = tokenizer.batch_decode(
+                    generated_answer, skip_special_tokens=True
+                )
+                # add to the list of samples
+                samples.append({"task_id": task_id, "completion": generated_answer})
 
-    #     # decode the generated answer
-    #     generated_answer = tokenizer.batch_decode(
-    #         generated_answer, skip_special_tokens=True
-    #     )
-
-    #     print(f"Question: {test_question}")
-    #     print(f"Generation {model_idx} answer: {generated_answer[0]}")
-
-    #     # save the question and answer to a file
-    #     with open(
-    #         file=f"{MODEL_PATH}/model_out_{model_idx}_bs{block_size}.txt",
-    #         mode="w",
-    #         encoding="utf-8",
-    #     ) as f:
-    #         f.write(f"Question: {test_question}\n")
-    #         f.write(f"Generation {model_idx} answer: {generated_answer[0]}\n")
+        write_jsonl(
+            samples, f"{DATASET_PATH} + he_samples_gen{model_idx}_bs{block_size}.jsonl"
+        )
 
     # ────────────────── print the elapsed time ─────────────────────────
     # End the timer
@@ -772,12 +771,6 @@ if __name__ == "__main__":
         help="if set, only generate the histogram and skip the rest",
     )
     parser.add_argument(
-        "--test_output_only",
-        "-to",
-        action="store_true",
-        help="if set, only test the output of the model without perplexity stuff",
-    )
-    parser.add_argument(
         "--data_path",
         "-dp",
         type=str,
@@ -789,6 +782,12 @@ if __name__ == "__main__":
         "-uod",
         action="store_true",
         help="if set, use the original dataset instead of the synthetic dataset",
+    )
+    parser.add_argument(
+        "--human_eval_only",
+        "-heo",
+        action="store_true",
+        help="if set, only generate human eval samples and skip the rest",
     )
     args = parser.parse_args()
     main(**vars(args))
