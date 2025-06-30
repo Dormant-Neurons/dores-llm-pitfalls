@@ -311,7 +311,7 @@ def main(
     print(f"Min token count: {min(token_counts)}")
     print(f"Original dataset length: {len(original_dataset)}\n")
     original_dataset = original_dataset.map(format_prompt, batched=True)
-    original_dataset.save_to_disk(DATASET_PATH + f"/original_dataset_bs{block_size}")
+    original_dataset.save_to_disk(DATASET_PATH + f"original_dataset_bs{block_size}")
 
     assert block_size > min(token_counts), (
         f"{TColors.FAIL}Block size must be larger than "
@@ -320,7 +320,7 @@ def main(
 
     # preprocess the dataset
     chunked_dataset = preprocess_dataset(original_dataset, block_size, tokenizer)
-    chunked_dataset.save_to_disk(DATASET_PATH + f"/chunked_dataset_bs{block_size}")
+    chunked_dataset.save_to_disk(DATASET_PATH + f"chunked_dataset_bs{block_size}")
     # the dataloader is later used for the generation of the new dataset
     chunked_dataloader = DataLoader(
         chunked_dataset.with_format("torch"),
@@ -335,7 +335,7 @@ def main(
         for i in range(num_generations):
             # load the model
             model, tokenizer = FastLanguageModel.from_pretrained(
-                model_name=MODEL_SPECIFIER,  # if i == 0 else f"{MODEL_PATH}/model_{i-1}_fp16",
+                model_name=MODEL_SPECIFIER,  # if i == 0 else f"{MODEL_PATH}model_{i-1}_fp16",
                 max_seq_length=block_size,
                 dtype=None,
                 load_in_4bit=True,
@@ -367,7 +367,7 @@ def main(
             if i > 0 and not use_original_dataset:
                 # if the first training iteration is done, load the generated dataset from the disk
                 dataset = Dataset.load_from_disk(
-                    DATASET_PATH + f"/generated_dataset_{i - 1}_bs{block_size}"
+                    DATASET_PATH + f"generated_dataset_{i - 1}_bs{block_size}"
                 )
             else:
                 dataset = chunked_dataset
@@ -442,12 +442,12 @@ def main(
 
             # save the model
             trainer.model.save_pretrained(
-                f"{MODEL_PATH}/model_{i}_bs{block_size}",
+                f"{MODEL_PATH}model_{i}_bs{block_size}",
                 safe_serialization=True,
                 save_adapter=True,
                 save_config=True,
             )
-            trainer.tokenizer.save_pretrained(f"{MODEL_PATH}/model_{i}_bs{block_size}")
+            trainer.tokenizer.save_pretrained(f"{MODEL_PATH}model_{i}_bs{block_size}")
 
             del trainer
             del model
@@ -458,7 +458,7 @@ def main(
             # use the model to generate the new dataset
             # for this the model is loaded again with the quantized weights
             model, tokenizer = FastLanguageModel.from_pretrained(
-                model_name=f"{MODEL_PATH}/model_{i}_bs{block_size}",
+                model_name=f"{MODEL_PATH}model_{i}_bs{block_size}",
                 max_seq_length=block_size,
                 dtype=None,
                 load_in_4bit=True,
@@ -522,7 +522,7 @@ def main(
             for i in range(num_generations):
                 # load the model
                 model_name = (
-                    f"{MODEL_PATH}/model_{i}_bs{block_size}"
+                    f"{MODEL_PATH}model_{i}_bs{block_size}"
                     if i > 0 and not use_original_dataset
                     else MODEL_SPECIFIER
                 )
@@ -588,27 +588,27 @@ def main(
 
             # save the perplexity dict to a file
             torch.save(
-                perplexity_dict, DATASET_PATH + f"/perplexity_dict_bs{block_size}.pt"
+                perplexity_dict, DATASET_PATH + f"perplexity_dict_bs{block_size}.pt"
             )  # save the dict to a file
             print(
                 f"## {TColors.OKBLUE}{TColors.BOLD}Saved the perplexity dict under: "
-                f"{TColors.HEADER}{DATASET_PATH}/perplexity_dict_bs{block_size}.pt{TColors.ENDC}"
+                f"{TColors.HEADER}{DATASET_PATH}perplexity_dict_bs{block_size}.pt{TColors.ENDC}"
             )
             # save the all_perplexities list to a file
             torch.save(
-                all_perplexities, DATASET_PATH + f"/all_perplexities_bs{block_size}.pt"
+                all_perplexities, DATASET_PATH + f"all_perplexities_bs{block_size}.pt"
             )  # save the list to a file
             print(
                 f"## {TColors.OKBLUE}{TColors.BOLD}Saved the all_perplexities list under: "
-                f"{TColors.HEADER}{DATASET_PATH}/all_perplexities_bs{block_size}.pt{TColors.ENDC}"
+                f"{TColors.HEADER}{DATASET_PATH}all_perplexities_bs{block_size}.pt{TColors.ENDC}"
             )
         else:
             # load the perplexity dict and all_perplexities list from the files
             perplexity_dict = torch.load(
-                DATASET_PATH + f"/perplexity_dict_bs{block_size}.pt"
+                DATASET_PATH + f"perplexity_dict_bs{block_size}.pt"
             )
             all_perplexities = torch.load(
-                DATASET_PATH + f"/all_perplexities_bs{block_size}.pt"
+                DATASET_PATH + f"all_perplexities_bs{block_size}.pt"
             )
 
         # ────────────────── plot the perplexity histogram ─────────────────────────
@@ -661,7 +661,7 @@ def main(
             for _ in range(100):
                 # load the model
                 model, tokenizer = FastLanguageModel.from_pretrained(
-                    model_name=f"{MODEL_PATH}/model_{model_idx}_bs{block_size}",
+                    model_name=f"{MODEL_PATH}model_{model_idx}_bs{block_size}",
                     max_seq_length=block_size,
                     dtype=None,
                     load_in_4bit=True,
@@ -691,7 +691,7 @@ def main(
                 samples.append({"task_id": task_id, "completion": generated_answer})
 
         write_jsonl(
-            samples, f"{DATASET_PATH}/eval_samples_gen{model_idx}_bs{block_size}.jsonl"
+            samples, f"{DATASET_PATH}eval_samples_gen{model_idx}_bs{block_size}.jsonl"
         )
 
     # ────────────────── print the elapsed time ─────────────────────────
