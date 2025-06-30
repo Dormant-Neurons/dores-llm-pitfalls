@@ -200,9 +200,9 @@ def main(
     # set data paths
     if data_path != "":
         global DATASET_PATH
-        DATASET_PATH = os.path.join(data_path, "generated_datasets")
+        DATASET_PATH = os.path.join(data_path, "generated_datasets/")
         global MODEL_PATH
-        MODEL_PATH = os.path.join(data_path, "model_outputs")
+        MODEL_PATH = os.path.join(data_path, "model_outputs/")
         # create the directories if they do not exist
         os.makedirs(DATASET_PATH, exist_ok=True)
         os.makedirs(MODEL_PATH, exist_ok=True)
