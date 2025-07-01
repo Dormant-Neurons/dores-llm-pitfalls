@@ -1,4 +1,5 @@
 # project specific
+human_eval/
 datasets/
 outputs/
 generated_datasets/
