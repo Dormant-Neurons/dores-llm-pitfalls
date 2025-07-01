@@ -665,8 +665,8 @@ def main(
             desc="Generating samples from the models",
             total=len(problems)
         ):
-            # create x samples for each problem (how often to generate the answer)
-            for _ in range(1):
+            # create x samples for each problem (how often to generate the answer) -> pass@k
+            for _ in range(5):
                 # generate the answer for the test question
                 inputs = tokenizer(
                     problems[task_id]["prompt"],
@@ -685,7 +685,9 @@ def main(
                 # decode the generated answer
                 generated_answer = tokenizer.batch_decode(
                     generated_answer, skip_special_tokens=True
-                )
+                )[0]
+                # remove the prompt from the generated answer
+                generated_answer = generated_answer[len(problems[task_id]["prompt"]):]
                 # add to the list of samples
                 samples.append({"task_id": task_id, "completion": generated_answer})
 
