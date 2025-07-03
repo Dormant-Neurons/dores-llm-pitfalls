@@ -154,6 +154,7 @@ def main(
     human_eval_only: bool = False,
     data_path: str = "",
     use_original_dataset: bool = False,
+    model_specifier: str = "",
 ) -> None:
     """
     Main function to start the pitfall 1 fine-tuning
@@ -170,6 +171,7 @@ def main(
         human_eval_only (bool): if True, only generate human eval samples and skip the rest
         data_path (str): path to save the generated datasets and models
         use_original_dataset (bool): if True, use the original datainstead of the synthetic dataset
+        model_specifier (str): model specifier to use for the training
 
     Returns:
         None
@@ -206,6 +208,11 @@ def main(
         # create the directories if they do not exist
         os.makedirs(DATASET_PATH, exist_ok=True)
         os.makedirs(MODEL_PATH, exist_ok=True)
+
+    # set the model specifier
+    if model_specifier != "":
+        global MODEL_SPECIFIER
+        MODEL_SPECIFIER = model_specifier
 
     # have a nice system status print
     print(
@@ -789,6 +796,13 @@ if __name__ == "__main__":
         "-heo",
         action="store_true",
         help="if set, only generate human eval samples and skip the rest",
+    )
+    parser.add_argument(
+        "--model_specifier",
+        "-ms",
+        type=str,
+        default="",
+        help="model specifier to use for the training (default: unsloth/Qwen2.5-Coder-0.5B)",
     )
     args = parser.parse_args()
     main(**vars(args))
