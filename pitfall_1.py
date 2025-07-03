@@ -213,6 +213,7 @@ def main(
     if model_specifier != "":
         global MODEL_SPECIFIER
         MODEL_SPECIFIER = model_specifier
+    model_size = MODEL_SPECIFIER.split("-")[-1]
 
     # have a nice system status print
     print(
@@ -327,7 +328,9 @@ def main(
 
     # preprocess the dataset
     chunked_dataset = preprocess_dataset(original_dataset, block_size, tokenizer)
-    chunked_dataset.save_to_disk(DATASET_PATH + f"chunked_dataset_bs{block_size}")
+    chunked_dataset.save_to_disk(
+        DATASET_PATH + f"chunked_dataset_bs{block_size}_{model_size}"
+    )
     # the dataloader is later used for the generation of the new dataset
     chunked_dataloader = DataLoader(
         chunked_dataset.with_format("torch"),
@@ -374,7 +377,7 @@ def main(
             if i > 0 and not use_original_dataset:
                 # if the first training iteration is done, load the generated dataset from the disk
                 dataset = Dataset.load_from_disk(
-                    DATASET_PATH + f"generated_dataset_{i - 1}_bs{block_size}"
+                    DATASET_PATH + f"generated_dataset_{i - 1}_bs{block_size}_{model_size}"
                 )
             else:
                 dataset = chunked_dataset
@@ -465,7 +468,7 @@ def main(
             # use the model to generate the new dataset
             # for this the model is loaded again with the quantized weights
             model, tokenizer = FastLanguageModel.from_pretrained(
-                model_name=f"{MODEL_PATH}model_{i}_bs{block_size}",
+                model_name=f"{MODEL_PATH}model_{i}_bs{block_size}_{model_size}",
                 max_seq_length=block_size,
                 dtype=None,
                 load_in_4bit=True,
@@ -510,7 +513,7 @@ def main(
                 new_dataset = Dataset.from_dict({"text": new_data})
                 new_dataset = preprocess_dataset(new_dataset, block_size, tokenizer)
                 new_dataset.save_to_disk(
-                    DATASET_PATH + f"generated_dataset_{i}_bs{block_size}"
+                    DATASET_PATH + f"generated_dataset_{i}_bs{block_size}_{model_size}"
                 )
 
     # ────────────────── evaluate the models' perplexity and other metrics ─────────────────────────
@@ -529,7 +532,7 @@ def main(
             for i in range(num_generations):
                 # load the model
                 model_name = (
-                    f"{MODEL_PATH}model_{i}_bs{block_size}"
+                    f"{MODEL_PATH}model_{i}_bs{block_size}_{model_size}"
                     if i > 0 and not use_original_dataset
                     else MODEL_SPECIFIER
                 )
@@ -545,11 +548,12 @@ def main(
                 if i == 0 or use_original_dataset:
                     # for the first generation, use the original dataset
                     ppl_dataset = Dataset.load_from_disk(
-                        DATASET_PATH + f"/chunked_dataset_bs{block_size}"
+                        DATASET_PATH + f"/chunked_dataset_bs{block_size}_{model_size}"
                     )
                 else:
                     ppl_dataset = Dataset.load_from_disk(
-                        DATASET_PATH + f"/generated_dataset_{i - 1}_bs{block_size}"
+                        DATASET_PATH
+                        + f"/generated_dataset_{i - 1}_bs{block_size}_{model_size}"
                     )
 
                 ppl_dataloader = DataLoader(
@@ -595,27 +599,31 @@ def main(
 
             # save the perplexity dict to a file
             torch.save(
-                perplexity_dict, DATASET_PATH + f"perplexity_dict_bs{block_size}.pt"
+                perplexity_dict,
+                DATASET_PATH + f"perplexity_dict_bs{block_size}_{model_size}.pt",
             )  # save the dict to a file
             print(
                 f"## {TColors.OKBLUE}{TColors.BOLD}Saved the perplexity dict under: "
-                f"{TColors.HEADER}{DATASET_PATH}perplexity_dict_bs{block_size}.pt{TColors.ENDC}"
+                f"{TColors.HEADER}{DATASET_PATH}perplexity_dict_bs{block_size}_{model_size}.pt" \
+                f"{TColors.ENDC}"
             )
             # save the all_perplexities list to a file
             torch.save(
-                all_perplexities, DATASET_PATH + f"all_perplexities_bs{block_size}.pt"
+                all_perplexities,
+                DATASET_PATH + f"all_perplexities_bs{block_size}_{model_size}.pt",
             )  # save the list to a file
             print(
                 f"## {TColors.OKBLUE}{TColors.BOLD}Saved the all_perplexities list under: "
-                f"{TColors.HEADER}{DATASET_PATH}all_perplexities_bs{block_size}.pt{TColors.ENDC}"
+                f"{TColors.HEADER}{DATASET_PATH}all_perplexities_bs{block_size}_{model_size}.pt" \
+                f"{TColors.ENDC}"
             )
         else:
             # load the perplexity dict and all_perplexities list from the files
             perplexity_dict = torch.load(
-                DATASET_PATH + f"perplexity_dict_bs{block_size}.pt"
+                DATASET_PATH + f"perplexity_dict_bs{block_size}_{model_size}.pt"
             )
             all_perplexities = torch.load(
-                DATASET_PATH + f"all_perplexities_bs{block_size}.pt"
+                DATASET_PATH + f"all_perplexities_bs{block_size}_{model_size}.pt"
             )
 
         # ────────────────── plot the perplexity histogram ─────────────────────────
@@ -636,14 +644,16 @@ def main(
         plt.yscale("log")
         plt.xlabel("Perplexity")
         plt.ylabel("Probability")
-        plt.title(f"Perplexity of generated datapoints for blocksize of {block_size}")
+        plt.title(
+            f"Perplexity of generated datapoints for blocksize of {block_size}_{model_size}"
+        )
         plt.legend(loc="upper right")
         plt.tight_layout()
-        plt.savefig(f"perplexity_histogram_bs{block_size}.png")
+        plt.savefig(f"perplexity_histogram_bs{block_size}_{model_size}.png")
 
         print(
             f"## {TColors.OKBLUE}{TColors.BOLD}Saved the histogram under: "
-            f"{TColors.HEADER}./perplexity_histogram_bs{block_size}.png{TColors.ENDC}"
+            f"{TColors.HEADER}./perplexity_histogram_bs{block_size}_{model_size}.png{TColors.ENDC}"
         )
 
     # # ────────────────── test the models outputs ─────────────────────────
@@ -657,7 +667,7 @@ def main(
     for model_idx in range(num_generations):
         # load the model
         model, tokenizer = FastLanguageModel.from_pretrained(
-            model_name=f"{MODEL_PATH}model_{model_idx}_bs{block_size}",
+            model_name=f"{MODEL_PATH}model_{model_idx}_bs{block_size}_{model_size}",
             max_seq_length=2048,
             dtype=None,
             load_in_4bit=True,
@@ -699,7 +709,8 @@ def main(
                 samples.append({"task_id": task_id, "completion": generated_answer})
 
         write_jsonl(
-            f"{DATASET_PATH}eval_samples_gen{model_idx}_bs{block_size}.jsonl", samples
+            f"{DATASET_PATH}eval_samples_gen{model_idx}_bs{block_size}_{model_size}.jsonl",
+            samples,
         )
 
     # ────────────────── print the elapsed time ─────────────────────────
