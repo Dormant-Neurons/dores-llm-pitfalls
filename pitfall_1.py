@@ -604,8 +604,8 @@ def main(
             )  # save the dict to a file
             print(
                 f"## {TColors.OKBLUE}{TColors.BOLD}Saved the perplexity dict under: "
-                f"{TColors.HEADER}{DATASET_PATH}perplexity_dict_bs{block_size}_{specifier_name}.pt" \
-                f"{TColors.ENDC}"
+                f"{TColors.HEADER}{DATASET_PATH}perplexity_dict_bs{block_size}_{specifier_name}" \
+                f".pt{TColors.ENDC}"
             )
             # save the all_perplexities list to a file
             torch.save(
@@ -614,8 +614,8 @@ def main(
             )  # save the list to a file
             print(
                 f"## {TColors.OKBLUE}{TColors.BOLD}Saved the all_perplexities list under: "
-                f"{TColors.HEADER}{DATASET_PATH}all_perplexities_bs{block_size}_{specifier_name}.pt" \
-                f"{TColors.ENDC}"
+                f"{TColors.HEADER}{DATASET_PATH}all_perplexities_bs{block_size}_{specifier_name}" \
+                f".pt{TColors.ENDC}"
             )
         else:
             # load the perplexity dict and all_perplexities list from the files
@@ -653,7 +653,8 @@ def main(
 
         print(
             f"## {TColors.OKBLUE}{TColors.BOLD}Saved the histogram under: "
-            f"{TColors.HEADER}./perplexity_histogram_bs{block_size}_{specifier_name}.png{TColors.ENDC}"
+            f"{TColors.HEADER}./perplexity_histogram_bs{block_size}_{specifier_name}" \
+            f".png{TColors.ENDC}"
         )
 
     # # ────────────────── test the models outputs ─────────────────────────
