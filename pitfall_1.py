@@ -452,12 +452,14 @@ def main(
 
             # save the model
             trainer.model.save_pretrained(
-                f"{MODEL_PATH}model_{i}_bs{block_size}",
+                f"{MODEL_PATH}model_{i}_bs{block_size}_{specifier_name}",
                 safe_serialization=True,
                 save_adapter=True,
                 save_config=True,
             )
-            trainer.tokenizer.save_pretrained(f"{MODEL_PATH}model_{i}_bs{block_size}")
+            trainer.tokenizer.save_pretrained(
+                f"{MODEL_PATH}model_{i}_bs{block_size}_{specifier_name}"
+            )
 
             del trainer
             del model
